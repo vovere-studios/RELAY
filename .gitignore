@@ -15,3 +15,5 @@ node_modules.icloud-backup/
 .wrangler/
 
 node_modules
+
+supabase/.temp/
