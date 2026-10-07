@@ -1,0 +1,1 @@
+alter policy relay_files_read on storage.objects using(bucket_id='relay-documents' and exists(select 1 from public.suppliers s where s.organization_id::text=split_part(storage.objects.name,'/',1) and s.id::text=split_part(storage.objects.name,'/',2) and relay_private.can_access_org(s.organization_id)));
