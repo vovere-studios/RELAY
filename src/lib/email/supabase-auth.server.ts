@@ -1,10 +1,10 @@
 import { Webhook } from 'standardwebhooks';
 import { sendLovableEmail } from '@lovable.dev/email-js';
+import { renderAuthEmail } from './auth-template';
 
 type Action = 'signup' | 'magiclink' | 'invite' | 'recovery' | 'email_change' | 'reauthentication';
 type Payload = { user: { email: string; new_email?: string }; email_data: { email_action_type: Action; token: string; token_new?: string; token_hash: string; token_hash_new?: string } };
 const titles: Record<Action, string> = { signup: 'Confirm your RELAY account', magiclink: 'Your RELAY sign-in code', invite: 'Your RELAY invitation', recovery: 'Recover your RELAY account', email_change: 'Confirm your RELAY email address', reauthentication: 'Your RELAY verification code' };
-const escape = (s: string) => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 
 export function authMessages(payload: Payload) {
  const { user, email_data: data } = payload;
@@ -23,7 +23,7 @@ export function authMessages(payload: Payload) {
   const showLink = action !== 'reauthentication';
   if (showLink && (typeof message.hash !== 'string' || !message.hash)) throw new Error('Missing confirmation hash');
   const text = `${titles[action]}\n\n${message.token}\n\nEnter this code in RELAY. It is valid for a short time and can only be used once.${showLink ? `\n\nContinue: ${url.href}` : ''}\n\nIf you did not request this email, you can ignore it. Never share your code.\nRELAY — A product of VOVERE Studios.`;
-  const html = `<div style="background:#f4f4f2;padding:40px 20px;font-family:Arial,Helvetica,sans-serif;color:#161616"><div style="max-width:480px;margin:auto;background:white;padding:40px;border-radius:20px"><p style="font-size:22px;font-weight:600;letter-spacing:-1px">relay ↗</p><h1 style="font-size:25px;line-height:1.3">${escape(titles[action])}</h1><p>Enter your verification code in RELAY.</p><p style="font-size:34px;letter-spacing:6px;font-weight:600">${message.token}</p><p style="color:#666;font-size:14px;line-height:1.6">Your code is valid for a short time and can only be used once. Never share it.</p>${showLink ? `<p><a href="${escape(url.href)}" style="display:inline-block;background:#161616;color:white;padding:14px 22px;border-radius:10px;text-decoration:none">Continue to RELAY ↗</a></p>` : ''}<p style="color:#777;font-size:12px;line-height:1.6">If you did not request this email, you can ignore it.</p><hr style="border:0;border-top:1px solid #eee;margin:32px 0"><p style="font-size:11px;color:#777">A product of VOVERE Studios.</p></div></div>`;
+  const html = renderAuthEmail({ action, code: message.token, url: showLink ? url.href : undefined });
   return { ...message, subject: titles[action], html, text, action };
  });
 }
