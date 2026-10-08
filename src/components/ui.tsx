@@ -177,9 +177,15 @@ export function ListRow({
 }) {
   return <div className={`list-row ${className}`}>{children}</div>;
 }
-export function Dialog({ open, onClose, title, children, footer, className = "", closeDisabled = false }: {
+let modalScrollLocks = 0;
+let modalBodyOverflow = "";
+let modalReturnFocus: HTMLElement | null = null;
+
+export function Dialog({ open, onClose, title, heading, children, footer, className = "", closeDisabled = false, motion = "surface", id }: {
   open: boolean; onClose: () => void; title: string; children: ReactNode;
-  footer?: ReactNode; className?: string; closeDisabled?: boolean;
+  heading?: ReactNode; footer?: ReactNode; className?: string; closeDisabled?: boolean;
+  motion?: "surface" | "sheet";
+  id?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -191,14 +197,21 @@ export function Dialog({ open, onClose, title, children, footer, className = "",
   if (presentation.open !== open)
     setPresentation({ open, key: presentation.key + (open ? 1 : 0) });
   const session = presentation.key;
-  const overflow = useRef<string | null>(null);
-  const content = useRef({ title, children, footer });
+  const scrollLocked = useRef(false);
+  const content = useRef({ title, heading, children, footer });
   // Preserve the receipt/form through the exit. New content only enters on opening.
-  if (open) content.current = { title, children, footer };
+  if (open) content.current = { title, heading, children, footer };
   const restoreScroll = () => {
-    if (overflow.current !== null) {
-      document.body.style.overflow = overflow.current;
-      overflow.current = null;
+    if (scrollLocked.current) {
+      scrollLocked.current = false;
+      modalScrollLocks = Math.max(0, modalScrollLocks - 1);
+      if (!modalScrollLocks) {
+        document.body.style.overflow = modalBodyOverflow;
+        const target = modalReturnFocus;
+        modalReturnFocus = null;
+        if (target?.isConnected && target.getClientRects().length && !target.closest("dialog:not([open]), [inert]"))
+          target.focus({ preventScroll: true });
+      }
     }
   };
   useEffect(() => {
@@ -222,6 +235,7 @@ export function Dialog({ open, onClose, title, children, footer, className = "",
     const animations: Animation[] = [];
     let timer: ReturnType<typeof setTimeout> | undefined;
     const originTransform = () => {
+      if (motion === "sheet") return "translateY(-14px) scale(.98)";
       const from = trigger.current?.isConnected ? trigger.current.getBoundingClientRect() : null;
       const to = dialog.getBoundingClientRect();
       if (!from || from.width < 24 || !to.width || !to.height) return "translateY(18px) scale(.975)";
@@ -235,17 +249,24 @@ export function Dialog({ open, onClose, title, children, footer, className = "",
       dialog.dataset.state = "open";
       dialog.dataset.keyboard = String(keyboard.current);
       dialog.querySelector(".dialog-body")?.scrollTo(0, 0);
-      if (overflow.current === null) overflow.current = document.body.style.overflow;
+      if (!scrollLocked.current) {
+        if (!modalScrollLocks) {
+          modalBodyOverflow = document.body.style.overflow;
+          modalReturnFocus = trigger.current;
+        }
+        modalScrollLocks++;
+        scrollLocked.current = true;
+      }
       document.body.style.overflow = "hidden";
       if (animate && material && surface) {
         animations.push(material.animate([
           { transform: originTransform(), opacity: .7 },
           { transform: "none", opacity: 1 },
-        ], { duration: 460, easing: "cubic-bezier(.16,1,.3,1)" }));
+        ], { duration: motion === "sheet" ? 380 : 460, easing: "cubic-bezier(.16,1,.3,1)" }));
         animations.push(surface.animate([
           { opacity: 0, transform: "translateY(10px)" },
           { opacity: 1, transform: "none" },
-        ], { duration: 240, delay: 200, easing: "cubic-bezier(.16,1,.3,1)", fill: "backwards" }));
+        ], { duration: motion === "sheet" ? 300 : 240, delay: motion === "sheet" ? 60 : 200, easing: "cubic-bezier(.16,1,.3,1)", fill: "backwards" }));
       }
     } else if (dialog.open) {
       dialog.dataset.state = "closing";
@@ -270,7 +291,7 @@ export function Dialog({ open, onClose, title, children, footer, className = "",
     });
     return () => cancelAnimationFrame(frame);
   }, [session, open]);
-  return <dialog ref={ref} className={`dialog ${className}`} aria-labelledby={titleId}
+  return <dialog id={id} ref={ref} className={`dialog ${className}`} aria-labelledby={titleId}
     onKeyDownCapture={event => {
       if (event.key === "Escape") escapeFromMenu.current = Boolean(ref.current?.querySelector(".select-menu:popover-open"));
     }}
@@ -283,7 +304,7 @@ export function Dialog({ open, onClose, title, children, footer, className = "",
     }}>
     <div className="dialog-material" aria-hidden="true"/>
     <div className="dialog-surface">
-      <div className="dialog-header"><h2 id={titleId}>{content.current.title}</h2>
+      <div className="dialog-header"><h2 id={titleId} aria-label={content.current.heading ? content.current.title : undefined}>{content.current.heading || content.current.title}</h2>
         <Button variant="ghost" aria-label="Close dialog" disabled={closeDisabled} onClick={onClose}><X size={19}/></Button>
       </div>
       <div className="dialog-body" key={session}>{content.current.children}</div>

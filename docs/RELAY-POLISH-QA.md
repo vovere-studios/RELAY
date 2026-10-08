@@ -87,3 +87,35 @@ Real authenticated workspace checked: Add Supplier missing-field validation (no 
 Design reference inspected read-only: current VOVERE contact dialog, submission confirmation, liquid-glass surface, signature arrow and motion source at ce0d292; live contact surface viewed without submitting. VOVERE source and website unchanged. Brand OS and Emil references were explicitly retired by the user and are no longer applied.
 
 Final verification for this interaction pass: `npm run build` completed successfully (TypeScript, client/server and Nitro bundles); `git diff --check` passed. No backend or production workspace data was altered by this pass.
+
+## Queued feedback: mobile navigation and outcome motion — 8 October 2026
+
+This follow-up supersedes the ring icon and sage colour choice recorded above.
+
+| Before | After | Why |
+| --- | --- | --- |
+| Add Supplier plus contracted inside a ring | Plain anchored plus with the button's pressed feedback | Remove the explicitly rejected embellishment |
+| Pale sage/red outcomes | Clear mint green and coral red with adapted dark colours | Make saved/retry states easier to distinguish in a monochrome workspace |
+| Labels faded at the same position | Short masked vertical settling, fixed label footprint, drawn check and one success highlight | Outcome reads as a transition without moving neighbouring controls |
+| Mobile opened the desktop sidebar | Native modal navigation with current location, grouped links, company switch and a fixed account footer | Give mobile its own usable layout and scroll ownership |
+| Manual sidebar focus trap/Escape logic | Native Dialog with separate popover Escape and counted nested scroll locks | Closing a selection must not close the navigation or strand body scrolling |
+| Browser confirm for unsaved in-app departure | RELAY dialog with Keep editing / Leave without saving | Keep the decision and feedback inside the product |
+| Current destination could clear dirty state | Current destination/company preserves input and dirty state | Unsaved values must never appear saved |
+| Focused fields and validation lacked one rhythm | Shared focus ring and inline-message arrival; narrow search flex width corrected | Coherent input response and no search-icon wrapping on narrow screens |
+| Public menu icon was static | Two-bar/close morph; 44px opener and 48px destination rows | Clearer touch and navigation feedback |
+| Public FAQ/CTA led with local preview | Real account capabilities explained with separate demo clearly identified | Match the actual product journey |
+
+### Verification of this follow-up
+- Real owner account: all nine sections opened through the mobile menu at measured 320x740 CSS px and the desktop sidebar at 907x510. No horizontal document overflow or main error alerts in these scans.
+- Actual mobile menu and Supplier required-field validation viewed at 390x844; menu also viewed in dark mode. No supplier/company/member data was saved for QA.
+- At 320, menu body scrolled 123px independently while the account footer remained within the viewport. All destinations remained reachable. Company popover Escape collapsed only the selection.
+- Nested Settings departure: Keep editing retained the changed field; closing the menu restored body scrolling. Leave without saving returned to Suppliers, cleared the scroll lock, and restored focus to Open navigation. Same-page Settings selection retained dirty input; Discard restored VOVERE Studios.
+- Public navigation at 320: 44px opener, four 48px links, no horizontal overflow, Escape collapsed menu and restored opener focus.
+- Disposable controlled component probe: one operation started despite a second action during pending/confirmation; success completed its callback; rejection remained retryable; retry succeeded. Light and dark shared action styles viewed. No backend writes; probe source and public entry removed before build.
+- Actual Add Supplier motion captured in eight differing frames across 346ms (`relay-new-dialog-motion.webp`). Fresh real workspace console warning/error query returned no entries. Viewport override reset; original Light preference restored.
+
+The wider 768/1281 scans and database rollback suites above belong to the earlier architecture pass. This follow-up is Chromium UI evidence, not a physical-device matrix, concurrent load test or production email verification. Native browser unload prompts remain intentionally available; browser Back protection for dirty SPA forms is still a separate review item.
+
+Primary dashboard references consulted read-only: [Linear's 2026 design refresh](https://linear.app/now/behind-the-latest-design-refresh) and [Linear's custom iOS navigation](https://linear.app/now/linear-liquid-glass). The current VOVERE source remains a read-only reference. Retired Brand OS/Emil skills were not applied.
+
+Final release verification for this follow-up: `npm run build` exited 0 (TypeScript, client/server and Nitro bundles), and `git diff --check` passed. No QA entry/source remains in the worktree or production build. GitHub push sync and Lovable publishing remain distinct steps.

@@ -14,7 +14,6 @@ import {
   Building2,
   Plus,
   Minus,
-  Menu,
 } from "lucide-react";
 const steps = [
   {
@@ -54,11 +53,11 @@ const faq = [
   ],
   [
     "What can I try today?",
-    "The local preview includes an example network, supplier profiles, requirements and activity. You can create a local workspace, add suppliers and save documents on this device. Account sign-in opens a separate connected workspace. The connected workspace supports team invitations, secure supplier upload links and document sharing. Email delivery is being prepared.",
+    "Create a company workspace, connect your suppliers, organize documents and track requirements. Share files with chosen companies, invite colleagues through private links, and collect supplier documents through secure upload links. You can also explore the separate demo with example data before registering.",
   ],
   [
     "Where is my information stored?",
-    "In this local preview, workspace records stay in your browser and uploaded files stay in local browser storage. They do not sync across devices. The connected workspace uses private cloud storage and company permissions. Email delivery and production retention policies are still being prepared.",
+    "Account workspaces use cloud storage protected by company permissions. Documents are private until you choose to share them. The separate demo keeps its example workspace on your device and does not sync with your company account.",
   ],
   [
     "Who is behind Relay?",
@@ -98,6 +97,7 @@ export function PublicHeader() {
         relay<span aria-hidden="true">↗</span>
       </Link>
       <nav
+        id="website-navigation"
         className={menu ? "public-nav open" : "public-nav"}
         aria-label="Website navigation"
       >
@@ -110,7 +110,7 @@ export function PublicHeader() {
         <a href="/#questions" onClick={() => setMenu(false)}>
           Questions
         </a>
-        <Link to="/login">Sign in</Link>
+        <Link to="/login" onClick={()=>setMenu(false)}>Sign in</Link>
       </nav>
       <Link className="public-start" to="/signup">
         Get started <ArrowUpRight size={16} />
@@ -119,9 +119,12 @@ export function PublicHeader() {
         className="public-menu"
         aria-label="Toggle website navigation"
         aria-expanded={menu}
+        aria-controls="website-navigation"
         onClick={() => setMenu(!menu)}
       >
-        <Menu size={22} />
+        <svg className="navigation-toggle" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+          <path d="M4 8h16"/><path d="M4 16h16"/>
+        </svg>
       </button>
     </header>
   );
@@ -385,7 +388,7 @@ export function Website() {
             </span>
           </Link>
           <p className="public-local-note">
-            Explore the local preview. No account or payment required.
+            Start with your company. Or <Link to="/app">explore the demo</Link> first.
           </p>
         </section>
       </main>

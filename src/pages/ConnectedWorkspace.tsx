@@ -23,7 +23,7 @@ import {
   Check,
   ShieldCheck,
   Bell,
-  Menu,
+  ChevronDown,
   X,
   Package,
   Activity,
@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "../lib/theme";
 import { ActionButton, ActionIcon, useActionFeedback } from "../components/ActionFeedback";
+import { WorkspaceNavigation } from "../components/WorkspaceNavigation";
 import { requireSupabase } from "../lib/supabase";
 import {
   workspaceAction,
@@ -182,6 +183,7 @@ export function ConnectedWorkspace() {
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [menu, setMenu] = useState(false);
+  const [leaveIntent, setLeaveIntent] = useState<{ run: () => void } | null>(null);
   const [confirmation, setConfirmation] = useState<{id: string; title: string; description: string; label: string; run: () => Promise<unknown>} | null>(null);
   const [dialog, setDialog] = useState<
     | "supplier"
@@ -278,6 +280,7 @@ export function ConnectedWorkspace() {
     setSelected(null);
     setGenerated("");
     setConfirmation(null);
+    setLeaveIntent(null);
   }, [view, orgParam]);
   useEffect(() => {
     if (view !== "directory" && dialog !== "share") return;
@@ -303,41 +306,19 @@ export function ConnectedWorkspace() {
     };
   }, [directoryQuery, view, dialog]);
   useEffect(() => {
-    if (!menu) return;
-    const previous = document.body.style.overflow;
-    const before = document.activeElement as HTMLElement | null;
-    document.body.style.overflow = "hidden";
-    const sidebar = document.querySelector<HTMLElement>(".connected-sidebar");
-    const controls = () =>
-      Array.from(
-        sidebar?.querySelectorAll<HTMLElement>(
-          "a[href],button:not([disabled]),select:not([disabled])",
-        ) || [],
-      ).filter((element) => element.getClientRects().length > 0);
-    const frame = requestAnimationFrame(() => controls()[0]?.focus());
-    const close = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMenu(false);
-      if (event.key === "Tab") {
-        const nodes = controls();
-        const first = nodes[0];
-        const last = nodes[nodes.length - 1];
-        if (event.shiftKey && document.activeElement === first) {
-          event.preventDefault();
-          last?.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault();
-          first?.focus();
-        }
-      }
-    };
-    document.addEventListener("keydown", close);
-    return () => {
-      cancelAnimationFrame(frame);
-      document.body.style.overflow = previous;
-      document.removeEventListener("keydown", close);
-      if (before?.isConnected) before.focus();
-    };
-  }, [menu]);
+    const desktop = matchMedia("(min-width: 761px)");
+    const resize = () => { if (desktop.matches) setMenu(false); };
+    desktop.addEventListener("change", resize);
+    return () => desktop.removeEventListener("change", resize);
+  }, []);
+  function depart(run: () => void) {
+    if (settingsDirty) setLeaveIntent({ run });
+    else run();
+  }
+  function switchCompany(id: string) {
+    if (id === data?.org.id) { setMenu(false); return; }
+    depart(() => { setSettingsDirty(false); setMenu(false); setParams({ org: id, view }); });
+  }
   function invalidForm(event: FormEvent<HTMLFormElement>, id: string) {
     event.preventDefault();
     feedback.fail(id);
@@ -588,7 +569,6 @@ export function ConnectedWorkspace() {
     }
   }
   async function signOut() {
-    if(settingsDirty && !window.confirm("Sign out without saving your company changes?"))return;
     const result = await requireSupabase().auth.signOut();
     if (result.error) setError(result.error.message);
     else navigate("/login");
@@ -616,28 +596,28 @@ export function ConnectedWorkspace() {
     </div>
   );
   return (
-    <div className="app connected-app" onClickCapture={event=>{const link=event.target instanceof Element?event.target.closest("a[href]"):null;if(!settingsDirty || !link || link.getAttribute("href")?.startsWith("#"))return;if(!window.confirm("Leave without saving your company changes?")){event.preventDefault();event.stopPropagation();return;}setSettingsDirty(false);}}>
+    <div className="app connected-app" onClickCapture={event=>{
+      const link=event.target instanceof Element?event.target.closest<HTMLAnchorElement>("a[href]"):null;
+      if(!settingsDirty || !link || link.getAttribute("href")?.startsWith("#") || link.target === "_blank" || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const destination = new URL(link.href, location.href);
+      if (destination.href === location.href) return;
+      event.preventDefault(); event.stopPropagation();
+      depart(() => {
+        setSettingsDirty(false); setMenu(false);
+        if(destination.origin === location.origin) navigate(destination.pathname+destination.search+destination.hash);
+        else location.assign(destination.href);
+      });
+    }}>
       <a className="skip-link" href="#main">
         Skip to content
       </a>
       <aside
-        role={menu ? "dialog" : undefined}
-        aria-modal={menu || undefined}
-        aria-label={menu ? "Company navigation" : undefined}
-        className={`sidebar connected-sidebar ${menu ? "is-open" : ""}`}
+        className="sidebar connected-sidebar"
       >
         <div className="brand-row">
           <Link className="wordmark" to="/">
             relay<span>↗</span>
           </Link>
-          <Button
-            variant="ghost"
-            className="mobile-close"
-            aria-label="Close navigation"
-            onClick={() => setMenu(false)}
-          >
-            <X size={20} />
-          </Button>
         </div>
         <label className="connected-org">
           <span className="eyebrow">YOUR COMPANY</span>
@@ -645,7 +625,7 @@ export function ConnectedWorkspace() {
             aria-label="Select company workspace"
             disabled={busy || loading}
             value={data?.org.id || ""}
-            onChange={(event) => { if(settingsDirty && !window.confirm("Leave without saving your company changes?"))return;setSettingsDirty(false);setParams({ org: event.target.value, view }); }}
+            onChange={(event) => switchCompany(event.target.value)}
           >
             {data?.organizations.map((org) => (
               <option key={org.id} value={org.id}>
@@ -660,7 +640,8 @@ export function ConnectedWorkspace() {
               key={id}
               to={`/cloud?view=${id}${data ? `&org=${data.org.id}` : ""}`}
               className={`nav-item ${view === id ? "active" : ""}`}
-              onClick={() => { setSettingsDirty(false);setMenu(false); }}
+              aria-current={view === id ? "page" : undefined}
+              onClick={() => setMenu(false)}
             >
               <Icon size={17} strokeWidth={1.6} />
               <span>{label}</span>
@@ -677,7 +658,7 @@ export function ConnectedWorkspace() {
               <small>{data?.role || "Company access"}</small>
             </div>
           </div>
-          <button className="help-link" onClick={() => void signOut()}>
+          <button className="help-link" onClick={() => depart(() => { setSettingsDirty(false); void signOut(); })}>
             Sign out <LogOut size={15} />
           </button>
           <Link className="attribution" to="/app">
@@ -685,23 +666,26 @@ export function ConnectedWorkspace() {
           </Link>
         </div>
       </aside>
-      {menu && (
-        <button
-          className="mobile-scrim"
-          aria-label="Close navigation"
-          onClick={() => setMenu(false)}
-        />
-      )}
-      <div className="main-shell" inert={menu}>
+      <WorkspaceNavigation open={menu} onClose={()=>setMenu(false)} destinations={sections} view={view}
+        organizationId={data?.org.id} email={data?.user.email} role={data?.role} dark={resolved === "dark"}
+        onThemeChange={()=>setPreference(resolved === "light" ? "dark" : "light")}
+        refreshing={loading || refreshing} onRefresh={()=>void load()}
+        onSignOut={()=>depart(()=>{setSettingsDirty(false);setMenu(false);void signOut();})}
+        companySwitcher={<label className="navigation-company-switch"><span>Your company</span>
+          <Select aria-label="Select company workspace" disabled={busy || loading} value={data?.org.id || ""}
+            onChange={event=>switchCompany(event.target.value)}>
+            {data?.organizations.map(org=><option key={org.id} value={org.id}>{org.legal_name}</option>)}
+          </Select>
+        </label>}/>
+      <div className="main-shell">
         <header className="topbar">
+          <Link className="mobile-workspace-brand" to="/" aria-label="Relay home">relay<span>↗</span></Link>
+          <button className="workspace-location" aria-label="Open navigation" aria-haspopup="dialog"
+            aria-expanded={menu} aria-controls="workspace-navigation" onClick={()=>setMenu(true)}>
+            <span>{view === "directory" ? "Discover" : sections.find(section=>section.id === view)?.label}</span>
+            <ChevronDown size={14}/>
+          </button>
           <div className="breadcrumb">
-            <button
-              className="icon-button mobile-menu"
-              aria-label="Open navigation"
-              onClick={() => setMenu(true)}
-            >
-              <Menu size={20} />
-            </button>
             <span>Workspace</span>
             <span className="crumb-separator">/</span>
             <span>
@@ -720,7 +704,7 @@ export function ConnectedWorkspace() {
               <Bell size={18} />
             </button>
             <button
-              className="icon-button"
+              className="icon-button workspace-refresh"
               aria-label="Refresh workspace"
               disabled={loading || refreshing}
               onClick={() => void load()}
@@ -1554,6 +1538,13 @@ export function ConnectedWorkspace() {
           <span>A product of VOVERE</span>
         </footer>
       </div>
+      <Dialog open={!!leaveIntent} onClose={()=>setLeaveIntent(null)} title="Keep your changes?" className="leave-dialog">
+        <p>Your company settings have unsaved changes. You can keep editing or leave without saving.</p>
+        <div className="confirmation-actions">
+          <Button variant="secondary" onClick={()=>setLeaveIntent(null)}>Keep editing</Button>
+          <Button onClick={()=>{const intent=leaveIntent;setLeaveIntent(null);intent?.run();}}>Leave without saving <ArrowUpRight size={15}/></Button>
+        </div>
+      </Dialog>
       <Dialog closeDisabled={busy} open={!!confirmation} onClose={()=>{if(!busy){if(confirmation)feedback.reset(confirmation.id);setConfirmation(null);}}} title={confirmation?.title || "Confirm your action."}>
         {confirmation && <div className="workspace-form"><p>{confirmation.description}</p>
           {error && <p className="form-feedback-error" role="alert"><X size={15}/><span>{error}</span></p>}

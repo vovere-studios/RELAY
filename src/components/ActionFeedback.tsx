@@ -98,10 +98,7 @@ export function ActionButton({
 export function ActionIcon({ kind = "add" }: { kind?: "add" | "upload" | "adjust" | "request" }) {
   return <svg className={`action-icon action-icon-${kind}`} width="18" height="18" viewBox="0 0 24 24"
     fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    {kind === "add" ? <>
-      <circle className="action-icon-ring" cx="12" cy="12" r="9"/>
-      <path className="action-icon-plus" d="M12 5v14M5 12h14"/>
-    </> : kind === "upload" ? <>
+    {kind === "add" ? <path className="action-icon-plus" d="M12 5v14M5 12h14"/> : kind === "upload" ? <>
       <path className="action-icon-tray" d="M4 15v5h16v-5"/>
       <g className="action-icon-lift"><path d="M12 16V4m-5 5 5-5 5 5"/></g>
     </> : kind === "adjust" ? <>
