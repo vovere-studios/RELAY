@@ -75,15 +75,15 @@ export function SignatureScene() {
           gsap.set(captions[0], { autoAlpha: 1, y: 0 });
           gsap.set(host.querySelector(".scene-identity"), {
             autoAlpha: 0,
-            scale: 0.8,
-            y: 25,
+            scale: 0.94,
+            y: 36,
           });
           const tl = gsap.timeline({
             scrollTrigger: {
               trigger: host,
               start: "top 80px",
               end: "bottom bottom",
-              scrub: 0.55,
+              scrub: mobile ? 0.8 : 1.05,
               invalidateOnRefresh: true,
             },
           });
@@ -113,10 +113,10 @@ export function SignatureScene() {
               autoAlpha: 1,
               scale: 1,
               y: 0,
-              duration: 0.85,
-              ease: "power3.out",
+              duration: 1.15,
+              ease: "power2.inOut",
             },
-            0.55,
+            0.85,
           )
             .to(
               host.querySelector(".scene-lines"),

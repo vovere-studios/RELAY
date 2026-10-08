@@ -1,3 +1,5 @@
+import { LoadingIndicator } from './ui';
+import { Select } from './Select';
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Upload, Download, ArrowUpRight } from "lucide-react";
@@ -73,7 +75,7 @@ export function AddSupplier() {
           <div className="form-grid">
             <label>
               Country
-              <select required name="country" defaultValue="">
+              <Select required name="country" defaultValue="">
                 <option value="" disabled>
                   Select country
                 </option>
@@ -82,7 +84,7 @@ export function AddSupplier() {
                     {c.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
             <label>
               Category
@@ -201,7 +203,7 @@ export function UploadDocument({ supplierId }: { supplierId?: string }) {
         <form className="workspace-form" onSubmit={submit}>
           <label>
             Supplier
-            <select name="supplier" required defaultValue={supplierId || ""}>
+            <Select name="supplier" required defaultValue={supplierId || ""}>
               <option value="" disabled>
                 Choose a supplier
               </option>
@@ -210,15 +212,15 @@ export function UploadDocument({ supplierId }: { supplierId?: string }) {
                   {s.legalName}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <label>
             Document type
-            <select name="kind">
+            <Select name="kind">
               <option value="certificate">Certificate</option>
               <option value="declaration">Declaration</option>
               <option value="company">Company information</option>
-            </select>
+            </Select>
           </label>
           <label className="file-drop">
             <Upload size={26} />
@@ -237,7 +239,7 @@ export function UploadDocument({ supplierId }: { supplierId?: string }) {
             </p>
           )}
           <Button type="submit" disabled={busy}>
-            {busy ? "Saving document…" : "Save document"}
+            {busy ? <LoadingIndicator compact label="Saving document…" /> : "Save document"}
             <ArrowUpRight size={16} />
           </Button>
         </form>
@@ -465,7 +467,7 @@ export function CreateRequest() {
         <form className="workspace-form" onSubmit={submit}>
           <label>
             Supplier
-            <select required name="supplier" defaultValue="">
+            <Select required name="supplier" defaultValue="">
               <option value="" disabled>
                 Select supplier
               </option>
@@ -474,7 +476,7 @@ export function CreateRequest() {
                   {r.supplier.legalName}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <label>
             Request title

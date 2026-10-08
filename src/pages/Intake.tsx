@@ -1,3 +1,5 @@
+import { LoadingIndicator } from '../components/ui';
+import { Select } from '../components/Select';
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowUpRight, Check, Files, ShieldCheck } from "lucide-react";
@@ -173,11 +175,11 @@ export function Intake() {
                 </label>
                 <label>
                   Document type
-                  <select name="kind" disabled={busy}>
+                  <Select name="kind" disabled={busy}>
                     <option value="certificate">Certificate</option>
                     <option value="declaration">Declaration</option>
                     <option value="company">Company information</option>
-                  </select>
+                  </Select>
                 </label>
                 <label className="intake-drop">
                   <Files size={25} />
@@ -219,7 +221,7 @@ export function Intake() {
                   </p>
                 )}
                 <Button type="submit" disabled={busy}>
-                  {busy ? "Sending your documents…" : "Send documents"}
+                  {busy ? <LoadingIndicator compact label="Sending your documents…" /> : "Send documents"}
                   <ArrowUpRight size={16} />
                 </Button>
               </form>
@@ -303,7 +305,7 @@ export function JoinWorkspace() {
           )}
           {signedIn ? (
             <Button onClick={() => void accept()} disabled={busy}>
-              {busy ? "Joining…" : "Accept invitation"}
+              {busy ? <LoadingIndicator compact label="Joining…" /> : "Accept invitation"}
               <ArrowUpRight size={17} />
             </Button>
           ) : (

@@ -1,3 +1,4 @@
+import { Select } from '../components/Select';
 import {
   useCallback,
   useEffect,
@@ -46,6 +47,7 @@ import {
 import { useFeedback } from "../components/Feedback";
 import {
   Badge,
+  LoadingIndicator,
   Button,
   Dialog,
   EmptyState,
@@ -698,7 +700,7 @@ export function ConnectedWorkspace() {
         </div>
         <label className="connected-org">
           <span className="eyebrow">YOUR COMPANY</span>
-          <select
+          <Select
             aria-label="Select company workspace"
             disabled={busy || loading}
             value={data?.org.id || ""}
@@ -709,7 +711,7 @@ export function ConnectedWorkspace() {
                 {org.legal_name}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <nav aria-label="Company workspace navigation">
           {sections.map(({ id, label, icon: Icon }) => (
@@ -840,8 +842,7 @@ export function ConnectedWorkspace() {
           {!data ? (
             loading ? (
               <div className="connected-loading" role="status">
-                <span />
-                <p>Connecting your workspace…</p>
+                <LoadingIndicator label="Connecting your workspace…" />
               </div>
             ) : (
               <EmptyState
@@ -1306,9 +1307,7 @@ export function ConnectedWorkspace() {
                     />
                   </div>
                   {directoryLoading && (
-                    <p role="status" className="quiet-note">
-                      Searching the company directory…
-                    </p>
+                    <LoadingIndicator compact label="Searching the company directory…" />
                   )}
                   <div className="company-discovery-grid">
                     {directory
@@ -1389,7 +1388,7 @@ export function ConnectedWorkspace() {
                           </small>
                         </div>
                         {data.role === "owner" && member.role !== "owner" ? (
-                          <select
+                          <Select
                             aria-label={`Role for ${member.email}`}
                             value={member.role}
                             disabled={busy}
@@ -1406,7 +1405,7 @@ export function ConnectedWorkspace() {
                           >
                             <option value="member">Member</option>
                             <option value="admin">Administrator</option>
-                          </select>
+                          </Select>
                         ) : (
                           <Badge>{member.role}</Badge>
                         )}
@@ -1585,7 +1584,7 @@ export function ConnectedWorkspace() {
                   </section>
                   {manager ? (
                     <Button type="submit" disabled={busy}>
-                      {busy ? "Saving…" : "Save settings"}
+                      {busy ? <LoadingIndicator compact label="Saving…" /> : "Save settings"}
                       <Check size={16} />
                     </Button>
                   ) : (
@@ -1817,7 +1816,7 @@ export function ConnectedWorkspace() {
                         </div>
                         {manager && (
                           <>
-                            <select
+                            <Select
                               name="document"
                               aria-label={`Evidence for ${requirement.name}`}
                               required={
@@ -1840,7 +1839,7 @@ export function ConnectedWorkspace() {
                                     {doc.name}
                                   </option>
                                 ))}
-                            </select>
+                            </Select>
                             <Button
                               type="submit"
                               variant="secondary"
@@ -1977,7 +1976,7 @@ export function ConnectedWorkspace() {
                   </label>
                   <label>
                     Role
-                    <select name="role">
+                    <Select name="role">
                       <option value="member">
                         Member · View company information
                       </option>
@@ -1986,7 +1985,7 @@ export function ConnectedWorkspace() {
                           Administrator · Manage company information
                         </option>
                       )}
-                    </select>
+                    </Select>
                   </label>
                   <p className="quiet-note">
                     The recipient must accept using this confirmed email
@@ -1997,7 +1996,7 @@ export function ConnectedWorkspace() {
                 <>
                   <label>
                     Recipient company
-                    <select name="recipient" required>
+                    <Select name="recipient" required>
                       <option value="">Choose a registered company</option>
                       {directory
                         .filter(
@@ -2011,7 +2010,7 @@ export function ConnectedWorkspace() {
                             {company.display_name}
                           </option>
                         ))}
-                    </select>
+                    </Select>
                   </label>
                   <fieldset className="share-document-options">
                     <legend>Choose documents to share</legend>
@@ -2035,7 +2034,7 @@ export function ConnectedWorkspace() {
                 <>
                   <label>
                     Supplier
-                    <select required name="connection">
+                    <Select required name="connection">
                       {data.health.map((row) => (
                         <option key={row.id} value={row.id || ""}>
                           {
@@ -2045,7 +2044,7 @@ export function ConnectedWorkspace() {
                           }
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </label>
                   <label>
                     Request title
@@ -2069,13 +2068,13 @@ export function ConnectedWorkspace() {
                 <>
                   <label>
                     Supplier
-                    <select required name="supplier">
+                    <Select required name="supplier">
                       {data.suppliers.map((company) => (
                         <option key={company.id} value={company.id}>
                           {company.legal_name}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </label>
                   {dialog === "product" ? (
                     <>
@@ -2096,11 +2095,11 @@ export function ConnectedWorkspace() {
                     <>
                       <label>
                         Document type
-                        <select name="kind">
+                        <Select name="kind">
                           <option value="certificate">Certificate</option>
                           <option value="declaration">Declaration</option>
                           <option value="company">Company information</option>
-                        </select>
+                        </Select>
                       </label>
                       <label className="file-drop">
                         PDF, PNG or JPEG · Up to 10 MB
@@ -2131,7 +2130,7 @@ export function ConnectedWorkspace() {
                 }
               >
                 {busy
-                  ? "Saving…"
+                  ? <LoadingIndicator compact label="Saving…" />
                   : dialog === "invite"
                     ? "Create invitation"
                     : dialog === "share"
@@ -2188,7 +2187,7 @@ function CertificateForm({
       <h3>Record certificate details.</h3>
       <label>
         Supporting certificate
-        <select name="document" required>
+        <Select name="document" required>
           <option value="">Choose a document</option>
           {data.documents
             .filter(
@@ -2200,7 +2199,7 @@ function CertificateForm({
                 {doc.name}
               </option>
             ))}
-        </select>
+        </Select>
       </label>
       <label>
         Standard

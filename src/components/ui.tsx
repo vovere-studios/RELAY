@@ -26,6 +26,9 @@ export function Input({
 }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={`input ${className}`} {...props} />;
 }
+export function LoadingIndicator({ label = "Working…", compact = false }: { label?: string; compact?: boolean }) {
+ return <span className={`relay-loading ${compact ? 'is-compact' : ''}`} role="status"><span className="relay-loading-track" aria-hidden="true"><i /><i /><i /></span><span>{label}</span></span>;
+}
 export function Badge({ children }: { children: ReactNode }) {
   return <span className="badge">{children}</span>;
 }
@@ -164,6 +167,7 @@ export function Dialog({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const escapeFromMenu = useRef(false);
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
@@ -231,9 +235,13 @@ export function Dialog({
       ref={ref}
       className="dialog"
       aria-labelledby={titleId}
+      onKeyDownCapture={(event) => {
+        if (event.key === "Escape") escapeFromMenu.current = Boolean(ref.current?.querySelector(".select-menu:popover-open"));
+      }}
       onCancel={(event) => {
         event.preventDefault();
-        onClose();
+        if (!escapeFromMenu.current) onClose();
+        escapeFromMenu.current = false;
       }}
       onClose={onClose}
       onClick={(event) => {

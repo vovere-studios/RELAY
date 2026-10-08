@@ -5,6 +5,7 @@ import "./styles.css";
 import "./styles/perspective.css";
 import "./styles/refinement.css";
 import "./styles/connected.css";
+import "./styles/polish.css";
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />

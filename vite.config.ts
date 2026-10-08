@@ -10,6 +10,6 @@ export default defineConfig({
         entities: path.resolve(__dirname, "node_modules/entities"),
       },
     },
-    server: { watch: { usePolling: true, interval: 1000, ignored: ["**/node_modules.icloud-backup/**"] } },
+    server: { watch: { usePolling: true, interval: 1000, ignored: ["**/node_modules.icloud-backup*/**"] } },
   },
 });

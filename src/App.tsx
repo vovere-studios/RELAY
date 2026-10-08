@@ -1,3 +1,4 @@
+import { LoadingIndicator } from './components/ui';
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { MotionDirector } from "./components/Motion";
@@ -51,7 +52,7 @@ export function App() {
                 role="status"
               >
                 <span className="wordmark">relay ↗</span>
-                <p>Opening your workspace…</p>
+                <LoadingIndicator label="Opening your workspace…" />
               </main>
             }
           >

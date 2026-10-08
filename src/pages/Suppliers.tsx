@@ -1,3 +1,4 @@
+import { Select } from '../components/Select';
 import { AddSupplier } from "../components/WorkspaceActions";
 import { useWorkspace } from "../data/Workspace";
 import { useState } from "react";
@@ -98,14 +99,14 @@ export function Suppliers() {
         <span>{rows.length} connections in view</span>
         <label>
           Sort by{" "}
-          <select
+          <Select
             aria-label="Sort suppliers"
             value={sort}
             onChange={(e) => setSort(e.target.value as "name" | "updated")}
           >
             <option value="name">Company name</option>
             <option value="updated">Recently updated</option>
-          </select>
+          </Select>
         </label>
       </div>
       <div className="supplier-table">

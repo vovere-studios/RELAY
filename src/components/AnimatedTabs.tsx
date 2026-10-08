@@ -21,7 +21,10 @@ export function AnimatedTabs({
       );
       if (!active || !indicator.current) return;
       indicator.current.style.width = `${active.offsetWidth}px`;
-      indicator.current.style.transform = `translateX(${active.offsetLeft}px)`;
+      indicator.current.style.height = `${active.offsetHeight}px`;
+      indicator.current.style.top = "0";
+      indicator.current.style.bottom = "auto";
+      indicator.current.style.transform = `translate(${active.offsetLeft}px, ${active.offsetTop}px)`;
     };
     update();
     const resize = new ResizeObserver(update);
