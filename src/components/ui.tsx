@@ -182,7 +182,7 @@ export function Dialog({
               {
                 opacity: 0,
                 transform:
-                  "perspective(1200px) translateY(28px) scale(.965) rotateX(3deg)",
+                  "perspective(1200px) translateY(18px) scale(.98) rotateX(2deg)",
               },
               {
                 opacity: 1,
@@ -190,7 +190,7 @@ export function Dialog({
                   "perspective(1200px) translateY(0) scale(1) rotateX(0)",
               },
             ],
-            { duration: 520, easing: "cubic-bezier(.16,1,.3,1)" },
+            { duration: 340, easing: "cubic-bezier(.16,1,.3,1)" },
           ),
         );
         dialog
@@ -205,8 +205,8 @@ export function Dialog({
                   { opacity: 1, transform: "none" },
                 ],
                 {
-                  duration: 360,
-                  delay: 65 + Math.min(i * 30, 150),
+                  duration: 240,
+                  delay: 30 + Math.min(i * 20, 80),
                   easing: "cubic-bezier(.16,1,.3,1)",
                   fill: "backwards",
                 },

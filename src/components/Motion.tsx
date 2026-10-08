@@ -60,7 +60,7 @@ export function MotionPanel({
         { opacity: 0, transform: "translateY(18px) scale(.985)" },
         { opacity: 1, transform: "none" },
       ],
-      { duration: compact ? 320 : 640, easing: settle },
+      { duration: compact ? 240 : 640, easing: settle },
     );
     const items = [...el.children].map((child, i) =>
       child.animate(
@@ -69,8 +69,8 @@ export function MotionPanel({
           { opacity: 1, transform: "none" },
         ],
         {
-          duration: compact ? 280 : 560,
-          delay: 35 * i,
+          duration: compact ? 220 : 560,
+          delay: compact ? Math.min(20 * i, 60) : 35 * i,
           easing: settle,
           fill: "backwards",
         },

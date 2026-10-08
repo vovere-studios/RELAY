@@ -37,7 +37,9 @@ h1, h2, h3 { overflow-wrap: break-word; }
 .dialog-header { align-items: flex-start; gap: 16px; }
 .dialog-header h2 { padding-bottom: .08em; }
 .dialog-header > button { flex-shrink: 0; }
-.connected-org .select-control { max-width: 260px; }
+.connected-org { padding: 20px 0 16px; }
+.connected-org .select-control { max-width: 260px; font-size: 13px; font-weight: 500; }
+.connected-org .select-trigger { min-height: 40px; padding: 9px 11px; gap: 8px; border-radius: 10px; line-height: 1.5; }
 .directory-caption .select-control { width: auto; min-width: 180px; }
 @media(max-width:600px) {
  .public-main { padding-left: 20px; padding-right: 20px; }

@@ -28,3 +28,13 @@
 ## Scope
 
 The current product interface is English. This pass checks German company names and localized native browser date/validation UI; it does not add or claim a full German translation. Browser QA used Chromium through the Codex in-app browser, not physical Android/iOS devices or Safari. Responsive checks are evidence for the tested sizes, not a guarantee for every browser and device. The authenticated Supabase workspace was compiled and uses the same controls; no production data was changed during this UI pass.
+
+## Sidebar and interaction follow-up — 8 October 2026
+
+| Before | After | Why |
+| --- | --- | --- |
+| Workspace select inherited 16px form typography and nested horizontal padding | Sidebar-only 13px typography, 40px minimum height, 11px internal padding; outer horizontal padding removed | Company name gets more room without oversized form styling; long names can still wrap |
+| Compact panel arrival 320ms with unbounded child staggering | 240ms arrival, 220ms children, stagger capped at 60ms | Frequent switches settle promptly |
+| Dialog entrance 520ms, children delayed up to 215ms | 340ms entrance, smaller travel, children delayed at most 110ms | Retain depth with faster access to controls |
+
+Browser verification: connected sidebar trigger measured 161px wide and 40px high in the normal desktop viewport. The browser session did not have an authenticated workspace, so the real VOVERE Studios option could not be visually verified in that session. Demo dialog opened successfully. Shared form select sizes remain unchanged. Reduced-motion branches remain intact. Marketing scroll choreography was not altered in this follow-up.
