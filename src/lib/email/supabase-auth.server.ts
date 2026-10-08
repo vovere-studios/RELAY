@@ -29,7 +29,7 @@ export function authMessages(payload: Payload) {
 }
 
 export async function handleSupabaseAuthEmail(request: Request): Promise<Response> {
- const secret = process.env.SUPABASE_AUTH_EMAIL_HOOK_SECRET;
+ const secret = process.env.RELAY_AUTH_EMAIL_HOOK_SECRET || process.env.SUPABASE_AUTH_EMAIL_HOOK_SECRET;
  const apiKey = process.env.LOVABLE_API_KEY;
  if (!secret || !apiKey) return new Response('Email service is not configured', {status:503});
  const raw = await request.text();
