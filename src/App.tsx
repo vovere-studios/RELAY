@@ -3,11 +3,11 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { MotionDirector } from "./components/Motion";
 import { RouteFocus } from "./components/RouteFocus";
-import { Shell } from "./components/Shell";
+import { ThemeProvider } from "./lib/theme";
 import { FeedbackProvider } from "./components/Feedback";
-import { WorkspaceProvider } from "./data/Workspace";
+
 import { Website } from "./pages/marketing/Website";
-import { Access } from "./pages/marketing/Access";
+
 const CloudAccount = lazy(() =>
   import("./pages/Cloud").then((module) => ({ default: module.CloudAccount })),
 );
@@ -27,21 +27,12 @@ const Intake = lazy(() =>
 const JoinWorkspace = lazy(() =>
   import("./pages/Intake").then((m) => ({ default: m.JoinWorkspace })),
 );
-import { Overview } from "./pages/Overview";
-import { Suppliers } from "./pages/Suppliers";
-import { SupplierDetail } from "./pages/SupplierDetail";
-import {
-  ActivityPage,
-  Documents,
-  NotFound,
-  Organization,
-  Products,
-  Requests,
-} from "./pages/WorkspacePages";
+const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin").then(module=>({default:module.PlatformAdmin})));
+const Demo = lazy(() => import("./pages/Demo").then(module => ({default:module.Demo})));
 export function App() {
   return (
     <BrowserRouter>
-      <WorkspaceProvider>
+      <ThemeProvider>
         <FeedbackProvider>
           <Suspense
             fallback={
@@ -72,26 +63,17 @@ export function App() {
               <Route path="join" element={<JoinWorkspace />} />
               <Route path="account-security" element={<AccountSecurity />} />
               <Route path="cloud" element={<CloudWorkspace />} />
-              <Route path="preview-setup" element={<Access mode="signup" />} />
+              <Route path="admin" element={<PlatformAdmin />} />
+              <Route path="preview-setup" element={<Navigate to="/signup" replace />} />
               <Route path="website" element={<Navigate to="/" replace />} />
-              <Route path="app" element={<Shell />}>
-                <Route index element={<Overview />} />
-                <Route path="suppliers" element={<Suppliers />} />
-                <Route path="suppliers/:id" element={<SupplierDetail />} />
-                <Route path="documents" element={<Documents />} />
-                <Route path="requests" element={<Requests />} />
-                <Route path="products" element={<Products />} />
-                <Route path="organization" element={<Organization />} />
-                <Route path="activity" element={<ActivityPage />} />
-                <Route path="*" element={<NotFound />} />
-              </Route>
+              <Route path="app/*" element={<Demo />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
             <RouteFocus />
             <MotionDirector />
           </Suspense>
         </FeedbackProvider>
-      </WorkspaceProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

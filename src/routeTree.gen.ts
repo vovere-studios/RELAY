@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SplatRouteImport } from './routes/$'
+import { Route as ApiAdminActionRouteImport } from './routes/api/admin/action'
 import { Route as ApiAuthEmailHookRouteImport } from './routes/api/auth/email-hook'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 
@@ -22,6 +23,11 @@ const IndexRoute = IndexRouteImport.update({
 const SplatRoute = SplatRouteImport.update({
   id: '/$',
   path: '/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminActionRoute = ApiAdminActionRouteImport.update({
+  id: '/api/admin/action',
+  path: '/api/admin/action',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAuthEmailHookRoute = ApiAuthEmailHookRouteImport.update({
@@ -39,12 +45,14 @@ const LovableEmailTransactionalPreviewRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
+  '/api/admin/action': typeof ApiAdminActionRoute
   '/api/auth/email-hook': typeof ApiAuthEmailHookRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
+  '/api/admin/action': typeof ApiAdminActionRoute
   '/api/auth/email-hook': typeof ApiAuthEmailHookRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
 }
@@ -52,20 +60,30 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
+  '/api/admin/action': typeof ApiAdminActionRoute
   '/api/auth/email-hook': typeof ApiAuthEmailHookRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/$' | '/api/auth/email-hook' | '/lovable/email/transactional/preview'
+    | '/'
+    | '/$'
+    | '/api/admin/action'
+    | '/api/auth/email-hook'
+    | '/lovable/email/transactional/preview'
   fileRoutesByTo: FileRoutesByTo
   to:
-    '/' | '/$' | '/api/auth/email-hook' | '/lovable/email/transactional/preview'
+    | '/'
+    | '/$'
+    | '/api/admin/action'
+    | '/api/auth/email-hook'
+    | '/lovable/email/transactional/preview'
   id:
     | '__root__'
     | '/'
     | '/$'
+    | '/api/admin/action'
     | '/api/auth/email-hook'
     | '/lovable/email/transactional/preview'
   fileRoutesById: FileRoutesById
@@ -73,6 +91,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SplatRoute: typeof SplatRoute
+  ApiAdminActionRoute: typeof ApiAdminActionRoute
   ApiAuthEmailHookRoute: typeof ApiAuthEmailHookRoute
   LovableEmailTransactionalPreviewRoute: typeof LovableEmailTransactionalPreviewRoute
 }
@@ -91,6 +110,13 @@ declare module '@tanstack/react-router' {
       path: '/$'
       fullPath: '/$'
       preLoaderRoute: typeof SplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/action': {
+      id: '/api/admin/action'
+      path: '/api/admin/action'
+      fullPath: '/api/admin/action'
+      preLoaderRoute: typeof ApiAdminActionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/auth/email-hook': {
@@ -113,6 +139,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
+  ApiAdminActionRoute: ApiAdminActionRoute,
   ApiAuthEmailHookRoute: ApiAuthEmailHookRoute,
   LovableEmailTransactionalPreviewRoute: LovableEmailTransactionalPreviewRoute,
 }

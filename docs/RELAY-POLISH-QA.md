@@ -38,3 +38,32 @@ The current product interface is English. This pass checks German company names 
 | Dialog entrance 520ms, children delayed up to 215ms | 340ms entrance, smaller travel, children delayed at most 110ms | Retain depth with faster access to controls |
 
 Browser verification: connected sidebar trigger measured 161px wide and 40px high in the normal desktop viewport. The browser session did not have an authenticated workspace, so the real VOVERE Studios option could not be visually verified in that session. Demo dialog opened successfully. Shared form select sizes remain unchanged. Reduced-motion branches remain intact. Marketing scroll choreography was not altered in this follow-up.
+
+## Real dashboard, platform administration and email — 8 October 2026
+
+| Before | After | Why |
+| --- | --- | --- |
+| Startup fetched nearly every company table through many requests | One authorized snapshot per active view, stable 50-row pages, server-side search and full-company metrics | Bound transfer and rendering as data grows |
+| Stale requests continued during rapid view changes | AbortController cancellation, generation checks and 12s browser timeout | Avoid stale content and indefinite refresh states |
+| Real dashboard had no appearance control | Header toggle and Settings Light/Dark/System, OS and cross-tab synchronization | Same usable theme system for the real product |
+| Settings labels sat beside inputs; narrow header overlapped | Stacked full-width fields, 44px header controls, removed narrow-screen status label | Clear hierarchy and adequate touch targets |
+| Company owner was confused with platform owner | Independent `/admin` operator access, server authorization, audit and reversible suspension | Company ownership never authorizes platform administration |
+| Fixed overview | Four optional widgets with account/company/device-scoped saved layout | User can focus the overview without extra data requests |
+| Text arrow in email branding and links | Arrow removed; adaptive light/dark markup and restored footer breathing room | More restrained mail typography |
+
+### Verified
+- Existing rollback-only workflow suite passed: tenant isolation, invitation role restrictions, sharing/revocation, certificate integrity, guest intake reservation/replay.
+- New `supabase/tests/platform_and_paging.sql` passed before and after private function wrappers: 151 suppliers, first/last pages, search outside first page, ordinary owner denied operator access, suspended company denied direct reads and snapshot access, reactivation retained all 151 rows, anonymous snapshot denied. All fixtures rolled back; fixture user count confirmed zero.
+- All nine REAL dashboard sections opened in the authenticated VOVERE Studios owner account at measured 320, 768 and 1281 CSS px. No horizontal document overflow and no rendered main error alerts in this scan.
+- Appearance switched Light/Dark; selected state and theme updated. Widget hide and restore changed the actual overview. Settings dirty/save state and discard were verified without changing company data.
+- Public site opened at measured 320/768/1281; no horizontal overflow. Current browser error log returned no entries.
+- `/admin` loaded for the explicitly bootstrapped operator account. Operator workspace protected from suspension. Admin change endpoint rejected unsigned requests with HTTP 401.
+- Auth email markup: no arrow glyph, dark-mode CSS present, real VOVERE image loaded, no horizontal overflow in browser preview.
+- TypeScript and production builds completed during the pass; rerun final build after final source changes before committing.
+
+### Production and test limits
+This is NOT a concurrent load test for thousands of active users, an exhaustive device matrix, or proof of actual email-client rendering and mailbox delivery. Browser testing used Chromium with responsive viewports, not physical iOS/Android devices. Company datasets on the logged-in owner account are small; page boundaries were separately verified with rollback fixtures. No upgrade or paid infrastructure was enabled.
+
+Private admin tables deliberately deny direct client access and have no public RLS policy. Public RPCs are security-invoker wrappers around narrowly authorized private implementations. Security advisors retain informational deny-default policy notices and the existing leaked-password-protection warning; passwordless sign-in does not remove that configuration warning. See [Supabase password security](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection).
+
+Operator-change email notifications use the existing Lovable server key and report unavailable delivery separately from saved access changes. Production delivery must be checked after publishing. Automatic registration alerts, team invitations and supplier-request emails are not implemented by this pass. Browser Back protection for unsaved SPA forms requires further review; unload, link navigation, company switching and sign-out have guards.

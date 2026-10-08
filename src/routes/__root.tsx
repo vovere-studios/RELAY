@@ -16,5 +16,5 @@ export const Route = createRootRoute({
   shellComponent: RootShell,
   component: RootComponent,
 });
-function RootShell({children}:{children:ReactNode}) { return <html lang="en" suppressHydrationWarning><head><HeadContent/><script dangerouslySetInnerHTML={{__html:'try{document.documentElement.dataset.theme=localStorage.getItem("relay-theme")||"light"}catch{}'}}/></head><body>{children}<Scripts/></body></html>; }
+function RootShell({children}:{children:ReactNode}) { return <html lang="en" suppressHydrationWarning><head><HeadContent/><script dangerouslySetInnerHTML={{__html:'try{const t=localStorage.getItem("relay-theme");document.documentElement.dataset.theme=t==="light"||t==="dark"?t:matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}catch{}'}}/></head><body>{children}<Scripts/></body></html>; }
 function RootComponent() { return <><ClientOnly fallback={<Loading/>}><Suspense fallback={<Loading/>}><RelayApp/></Suspense></ClientOnly><Outlet/></>; }

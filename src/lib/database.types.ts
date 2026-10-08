@@ -885,6 +885,8 @@ export type Database = {
       }
     }
     Functions: {
+      relay_platform_admin: { Args: { action: string; payload?: Json }; Returns: Json }
+      relay_workspace_snapshot: { Args: { payload?: Json }; Returns: Json }
       add_supplier_connection: {
         Args: {
           company_name: string

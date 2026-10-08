@@ -1,0 +1,31 @@
+begin;
+do $test$
+declare operator uuid; u uuid:=gen_random_uuid(); org uuid:=gen_random_uuid(); v jsonb; n integer; denied boolean; link jsonb;
+begin
+ select user_id into strict operator from relay_private.platform_operators limit 1;
+ insert into auth.users(id,email,email_confirmed_at,raw_app_meta_data,raw_user_meta_data) values(u,'relay-scale-test@example.invalid',now(),'{}','{}');
+ insert into public.organizations(id,owner_id,legal_name) values(org,u,'Scale test');
+ perform set_config('request.jwt.claim.sub',u::text,true);execute 'set local role authenticated';
+ for n in 1..151 loop perform public.add_supplier_connection(org,'Supplier '||lpad(n::text,3,'0'),'Austria','AT','','');end loop;
+ v:=public.relay_workspace_snapshot(jsonb_build_object('organization_id',org,'view','suppliers','page',0));
+ if jsonb_array_length(v->'listSupplierIds')<>50 or (v->>'total')::int<>151 then raise exception 'First page/count failed';end if;
+ v:=public.relay_workspace_snapshot(jsonb_build_object('organization_id',org,'view','suppliers','page',3));
+ if jsonb_array_length(v->'listSupplierIds')<>1 then raise exception 'Last page failed';end if;
+ v:=public.relay_workspace_snapshot(jsonb_build_object('organization_id',org,'view','suppliers','query','151'));
+ if (v->>'total')::int<>1 then raise exception 'Search outside first page failed';end if;
+ denied:=false;begin perform public.relay_platform_admin('companies');exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Company owner got platform access';end if;
+ execute 'reset role';perform set_config('request.jwt.claim.sub',operator::text,true);execute 'set local role authenticated';
+ perform public.relay_platform_admin('suspend',jsonb_build_object('organization_id',org,'reason','Temporary rollback test'));
+ execute 'reset role';perform set_config('request.jwt.claim.sub',u::text,true);execute 'set local role authenticated';
+ if (select count(*) from public.suppliers where organization_id=org)<>0 then raise exception 'Suspended tenant read allowed';end if;
+ denied:=false;begin perform public.relay_workspace_snapshot(jsonb_build_object('organization_id',org));exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Suspended snapshot allowed';end if;
+ execute 'reset role';perform set_config('request.jwt.claim.sub',operator::text,true);execute 'set local role authenticated';
+ perform public.relay_platform_admin('reactivate',jsonb_build_object('organization_id',org,'reason','Rollback test complete'));
+ execute 'reset role';perform set_config('request.jwt.claim.sub',u::text,true);execute 'set local role authenticated';
+ if (select count(*) from public.suppliers where organization_id=org)<>151 then raise exception 'Reactivation lost data';end if;
+ execute 'reset role';perform set_config('request.jwt.claim.sub','',true);execute 'set local role anon';
+ denied:=false;begin perform public.relay_workspace_snapshot('{}');exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Anonymous snapshot allowed';end if;
+ execute 'reset role';
+end $test$;
+rollback;
+select '151-row pagination/search, operator isolation, suspension and reactivation assertions passed' as result;

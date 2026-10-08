@@ -30,7 +30,12 @@ import {
   X,
   Package,
   Activity,
+  Sun,
+  Moon,
+  Monitor,
+  SlidersHorizontal,
 } from "lucide-react";
+import { useTheme } from "../lib/theme";
 import { requireSupabase } from "../lib/supabase";
 import {
   workspaceAction,
@@ -60,6 +65,12 @@ import type { Database } from "../lib/database.types";
 
 type Health = Database["public"]["Views"]["relationship_health"]["Row"];
 type Data = {
+  view: string;
+  listSupplierIds: string[];
+  metrics: { suppliers: number; documents: number; complete: number; requests: number };
+  total: number;
+  detailTotal: number;
+  page: number;
   org: Row<"organizations">;
   organizations: Row<"organizations">[];
   user: User;
@@ -144,6 +155,17 @@ export function ConnectedWorkspace() {
     ? params.get("view")!
     : "overview";
   const orgParam = params.get("org");
+  const page = Math.max(0, Math.min(100000, Math.floor(Number(params.get("page")) || 0)));
+  const { preference, resolved, setPreference } = useTheme();
+  const [settingsDirty, setSettingsDirty] = useState(false);
+  const [detailPage, setDetailPage] = useState(0);
+  const [lookupQuery, setLookupQuery] = useState("");
+  const [searchTerms, setSearchTerms] = useState({query:"",lookup:""});
+  const [refreshing, setRefreshing] = useState(false);
+  const [customize,setCustomize] = useState(false);
+  const [widgets,setWidgets] = useState<string[]>(["network","attention","activity","privacy"]);
+  const requestController = useRef<AbortController | null>(null);
+  const currentUser = useRef<User | null>(null);
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -161,6 +183,7 @@ export function ConnectedWorkspace() {
     | null
   >(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [shareIds,setShareIds] = useState<string[]>([]);
   const [generated, setGenerated] = useState<string>("");
   const [directory, setDirectory] = useState<Row<"company_directory">[]>([]);
   const [directoryQuery, setDirectoryQuery] = useState("");
@@ -169,186 +192,65 @@ export function ConnectedWorkspace() {
   const generation = useRef(0);
   const loadedOrg = useRef<string | null>(null);
   const manager = !!data && data.role !== "member";
+  useEffect(()=>{
+    if(!data)return;
+    try{const value=JSON.parse(localStorage.getItem(`relay-overview-${data.user.id}-${data.org.id}`)||"null");setWidgets(Array.isArray(value)?value.filter(item=>["network","attention","activity","privacy"].includes(item)):["network","attention","activity","privacy"]);}catch{setWidgets(["network","attention","activity","privacy"]);}
+  },[data?.org.id,data?.user.id]);
+  function updateWidgets(next:string[]){setWidgets(next);if(data)try{localStorage.setItem(`relay-overview-${data.user.id}-${data.org.id}`,JSON.stringify(next));}catch{notify("Layout changed.","Browser storage is unavailable, so this preference will not survive a reload.");}}
   const load = useCallback(async () => {
+    requestController.current?.abort();
+    const controller = new AbortController();
+    requestController.current = controller;
+    const timeout = setTimeout(()=>controller.abort(),12000);
     const version = ++generation.current;
     setLoading(
       !loadedOrg.current || (!!orgParam && loadedOrg.current !== orgParam),
     );
+    setRefreshing(true);
     setError("");
     const client = requireSupabase();
     try {
-      const auth = checkResult(await client.auth.getUser());
-      if (!auth.data.user) {
-        navigate("/login", { replace: true });
-        return;
+      let user = currentUser.current;
+      if (!user) {
+        const auth = await client.auth.getUser();
+        if (auth.error || !auth.data.user) { navigate("/login", { replace: true }); return; }
+        user = auth.data.user;
+        currentUser.current = user;
       }
-      const user = auth.data.user;
-      let organizations =
-        checkResult(
-          await client.from("organizations").select("*").order("created_at"),
-        ).data || [];
-      if (!organizations.length) {
-        checkResult(
-          await client.rpc("create_workspace", {
-            company_name: String(
-              user.user_metadata.company_name || "My company",
-            ),
-            full_name: String(user.user_metadata.full_name || ""),
-          }),
-        );
-        organizations =
-          checkResult(
-            await client.from("organizations").select("*").order("created_at"),
-          ).data || [];
+      const payload = { organization_id:orgParam, view, page, query:searchTerms.query, lookup:searchTerms.lookup, selected, detail_page:detailPage, detail_tab:detailTab, dialog };
+      let result = checkResult(await client.rpc("relay_workspace_snapshot", {payload}).abortSignal(controller.signal)).data as unknown as Omit<Data,"user"|"view"> & {needs_workspace?:boolean};
+      if (result.needs_workspace) {
+        checkResult(await client.rpc("create_workspace", {company_name:String(user.user_metadata.company_name || "My company"),full_name:String(user.user_metadata.full_name || "")}));
+        result = checkResult(await client.rpc("relay_workspace_snapshot", {payload}).abortSignal(controller.signal)).data as unknown as Omit<Data,"user"|"view">;
       }
-      const org =
-        organizations.find((company) => company.id === orgParam) ||
-        organizations[0];
-      if (!org) throw new Error("Your workspace could not be loaded.");
-      const members = await workspaceAction<Member[]>("team", {
-        organization_id: org.id,
-      });
-      const role =
-        org.owner_id === user.id
-          ? "owner"
-          : members.find((member) => member.id === user.id)?.role || "member";
-      const canManage = role !== "member";
-      const results = await Promise.all([
-        client
-          .from("suppliers")
-          .select("*")
-          .eq("organization_id", org.id)
-          .order("legal_name"),
-        client
-          .from("documents")
-          .select("*")
-          .eq("organization_id", org.id)
-          .order("uploaded_at", { ascending: false }),
-        client
-          .from("data_requests")
-          .select("*")
-          .eq("organization_id", org.id)
-          .order("requested_at", { ascending: false }),
-        client
-          .from("relationship_health")
-          .select("*")
-          .eq("organization_id", org.id),
-        client.from("requirements").select("*").eq("organization_id", org.id),
-        client.from("certificates").select("*").eq("organization_id", org.id),
-        client.from("products").select("*").eq("organization_id", org.id),
-        client
-          .from("workspace_events")
-          .select("*")
-          .eq("organization_id", org.id)
-          .order("created_at", { ascending: false })
-          .limit(50),
-        client
-          .from("company_directory")
-          .select("*")
-          .eq("organization_id", org.id)
-          .maybeSingle(),
-        client
-          .from("workspace_settings")
-          .select("*")
-          .eq("organization_id", org.id)
-          .maybeSingle(),
-        canManage
-          ? client
-              .from("team_invitations")
-              .select(
-                "id,organization_id,email,role,created_by,created_at,expires_at,revoked_at,accepted_by",
-              )
-              .eq("organization_id", org.id)
-              .order("created_at", { ascending: false })
-          : Promise.resolve({ data: [], error: null }),
-        canManage
-          ? client
-              .from("upload_links")
-              .select(
-                "id,organization_id,supplier_id,request_id,title,created_by,created_at,expires_at,revoked_at,uploads_used,max_files",
-              )
-              .eq("organization_id", org.id)
-              .order("created_at", { ascending: false })
-          : Promise.resolve({ data: [], error: null }),
-        client
-          .from("document_shares")
-          .select("*")
-          .eq("sender_organization_id", org.id)
-          .order("shared_at", { ascending: false }),
-        workspaceAction<SharedDocument[]>("received_shares", {
-          organization_id: org.id,
-        }),
-        client
-          .from("activities")
-          .select("*")
-          .eq("organization_id", org.id)
-          .order("occurred_at", { ascending: false })
-          .limit(50),
-      ]);
-      for (const result of results.slice(0, 13))
-        checkResult(result as { error: unknown });
       if (version !== generation.current) return;
-      checkResult(results[14]);
-      loadedOrg.current = org.id;
-      setData({
-        org,
-        organizations,
-        user,
-        role,
-        members,
-        suppliers: results[0].data || [],
-        documents: results[1].data || [],
-        requests: results[2].data || [],
-        health: results[3].data || [],
-        requirements: results[4].data || [],
-        certificates: results[5].data || [],
-        products: results[6].data || [],
-        events: [
-          ...(results[7].data || []),
-          ...(results[14].data || []).map((item) => ({
-            id: item.id,
-            organization_id: item.organization_id,
-            actor_id: item.actor_id,
-            title: item.title,
-            detail: item.description,
-            created_at: item.occurred_at,
-          })),
-        ]
-          .filter(
-            (item, index, items) =>
-              items.findIndex(
-                (other) =>
-                  other.title === item.title &&
-                  other.created_at === item.created_at,
-              ) === index,
-          )
-          .sort((a, b) => b.created_at.localeCompare(a.created_at))
-          .slice(0, 50),
-        directory: results[8].data,
-        settings: results[9].data,
-        invitations: results[10].data || [],
-        links: results[11].data || [],
-        sentShares: results[12].data || [],
-        shares: results[13],
-      });
+      loadedOrg.current = result.org.id;
+      setData({...result,user,view});
     } catch (error) {
-      if (version === generation.current) setError(errorMessage(error));
+      if (version === generation.current) setError(controller.signal.aborted ? "The connection took too long. Please try again." : errorMessage(error));
     } finally {
-      if (version === generation.current) setLoading(false);
+      clearTimeout(timeout);
+      if (version === generation.current) { setLoading(false); setRefreshing(false); }
     }
-  }, [navigate, orgParam]);
+  }, [navigate, orgParam, view, page, searchTerms, selected, detailPage, detailTab, dialog]);
+  useEffect(() => { void load(); return () => { generation.current++; requestController.current?.abort(); }; }, [load]);
   useEffect(() => {
-    void load();
-    const {
-      data: { subscription },
-    } = requireSupabase().auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT") navigate("/login", { replace: true });
+    const {data:{subscription}} = requireSupabase().auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT") { currentUser.current=null; navigate("/login",{replace:true}); }
+      else if (session?.user) currentUser.current=session.user;
     });
-    return () => {
-      generation.current++;
-      subscription.unsubscribe();
-    };
-  }, [load, navigate]);
+    return () => subscription.unsubscribe();
+  },[navigate]);
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchTerms({query,lookup:lookupQuery}),220);
+    return () => clearTimeout(timer);
+  },[query,lookupQuery]);
+  useEffect(() => { setDetailPage(0); },[selected,detailTab]);
+  useEffect(() => {
+    if (!settingsDirty) return;
+    const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue="";};
+    window.addEventListener("beforeunload",warn);return()=>window.removeEventListener("beforeunload",warn);
+  },[settingsDirty]);
   useEffect(() => {
     setQuery("");
     setMenu(false);
@@ -439,6 +341,8 @@ export function ConnectedWorkspace() {
   function openDialog(next: typeof dialog) {
     setError("");
     setGenerated("");
+    setLookupQuery("");
+    setShareIds([]);
     setDialog(next);
   }
   async function copy(url: string) {
@@ -573,7 +477,7 @@ export function ConnectedWorkspace() {
         await workspaceAction("share_documents", {
           organization_id: data.org.id,
           recipient_id: field(form, "recipient"),
-          document_ids: form.getAll("documents").map(String),
+          document_ids: shareIds,
         });
       setDialog(null);
       await load();
@@ -593,7 +497,7 @@ export function ConnectedWorkspace() {
   async function saveSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    await action(
+    const saved = await action(
       "settings",
       {
         name: field(form, "name"),
@@ -606,6 +510,7 @@ export function ConnectedWorkspace() {
       },
       "Workspace settings saved.",
     );
+    if(saved) setSettingsDirty(false);
   }
   async function saveSupplier(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -640,18 +545,14 @@ export function ConnectedWorkspace() {
     }
   }
   async function signOut() {
+    if(settingsDirty && !window.confirm("Sign out without saving your company changes?"))return;
     const result = await requireSupabase().auth.signOut();
     if (result.error) setError(result.error.message);
     else navigate("/login");
   }
   const supplier = data?.suppliers.find((company) => company.id === selected);
   const relationship = data?.health.find((row) => row.supplier_id === selected);
-  const shownSuppliers =
-    data?.suppliers.filter((company) =>
-      `${company.legal_name} ${company.country} ${company.category}`
-        .toLowerCase()
-        .includes(query.toLowerCase()),
-    ) || [];
+  const shownSuppliers = data?.suppliers.filter(company => data.listSupplierIds.includes(company.id)) || [];
   const title = titles[view];
   const generatedCard = generated && (
     <div className="generated-link">
@@ -675,7 +576,7 @@ export function ConnectedWorkspace() {
     </div>
   );
   return (
-    <div className="app connected-app">
+    <div className="app connected-app" onClickCapture={event=>{const link=event.target instanceof Element?event.target.closest("a[href]"):null;if(!settingsDirty || !link || link.getAttribute("href")?.startsWith("#"))return;if(!window.confirm("Leave without saving your company changes?")){event.preventDefault();event.stopPropagation();return;}setSettingsDirty(false);}}>
       <a className="skip-link" href="#main">
         Skip to content
       </a>
@@ -704,7 +605,7 @@ export function ConnectedWorkspace() {
             aria-label="Select company workspace"
             disabled={busy || loading}
             value={data?.org.id || ""}
-            onChange={(event) => setParams({ org: event.target.value, view })}
+            onChange={(event) => { if(settingsDirty && !window.confirm("Leave without saving your company changes?"))return;setSettingsDirty(false);setParams({ org: event.target.value, view }); }}
           >
             {data?.organizations.map((org) => (
               <option key={org.id} value={org.id}>
@@ -719,7 +620,7 @@ export function ConnectedWorkspace() {
               key={id}
               to={`/cloud?view=${id}${data ? `&org=${data.org.id}` : ""}`}
               className={`nav-item ${view === id ? "active" : ""}`}
-              onClick={() => setMenu(false)}
+              onClick={() => { setSettingsDirty(false);setMenu(false); }}
             >
               <Icon size={17} strokeWidth={1.6} />
               <span>{label}</span>
@@ -768,6 +669,9 @@ export function ConnectedWorkspace() {
             </span>
           </div>
           <div className="topbar-right">
+            <button className="icon-button" aria-label={`Switch to ${resolved === "light" ? "dark" : "light"} mode`} onClick={()=>setPreference(resolved==="light"?"dark":"light")}>
+              {resolved==="light"?<Moon size={18}/>:<Sun size={18}/>}
+            </button>
             <button
               className="icon-button"
               aria-label="Workspace updates"
@@ -778,10 +682,10 @@ export function ConnectedWorkspace() {
             <button
               className="icon-button"
               aria-label="Refresh workspace"
-              disabled={loading}
+              disabled={loading || refreshing}
               onClick={() => void load()}
             >
-              <RefreshCw size={17} className={loading ? "is-spinning" : ""} />
+              <RefreshCw size={17} className={refreshing ? "is-spinning" : ""} />
             </button>
             <span className="connection-indicator" />
             <span className="demo-label">Private workspace</span>
@@ -839,8 +743,8 @@ export function ConnectedWorkspace() {
               {error}
             </p>
           )}
-          {!data ? (
-            loading ? (
+          {!data || data.view !== view || loading ? (
+            loading || refreshing ? (
               <div className="connected-loading" role="status">
                 <LoadingIndicator label="Connecting your workspace…" />
               </div>
@@ -855,19 +759,17 @@ export function ConnectedWorkspace() {
             <MotionPanel identity={`${data.org.id}-${view}`} compact>
               {view === "overview" && (
                 <>
-                  <div className="connected-metrics">
+                  <div className="overview-tools"><span className="quiet-note">Your workspace at a glance.</span><Button variant="ghost" onClick={()=>setCustomize(true)}><SlidersHorizontal size={16}/>Customize overview</Button></div>
+                  {widgets.includes("network") && <div className="connected-metrics">
                     {[
-                      [data.suppliers.length, "Connected companies"],
+                      [data.metrics.suppliers, "Connected companies"],
                       [
-                        data.health.filter((row) => row.status === "complete")
-                          .length,
+                        data.metrics.complete,
                         "Complete profiles",
                       ],
-                      [data.documents.length, "Private documents"],
+                      [data.metrics.documents, "Private documents"],
                       [
-                        data.requests.filter(
-                          (request) => request.status === "open",
-                        ).length,
+                        data.metrics.requests,
                         "Open requests",
                       ],
                     ].map(([value, label]) => (
@@ -876,9 +778,9 @@ export function ConnectedWorkspace() {
                         <span>{label}</span>
                       </div>
                     ))}
-                  </div>
-                  <div className="connected-overview-grid">
-                    <section className="connected-panel">
+                  </div>}
+                  <div className={`connected-overview-grid ${!widgets.includes("attention") || !widgets.includes("activity") ? "is-single" : ""}`}>
+                    {widgets.includes("attention") && <section className="connected-panel">
                       <div className="connected-panel-heading">
                         <h2>What needs your attention.</h2>
                         <Link to={`/cloud?view=suppliers&org=${data.org.id}`}>
@@ -916,16 +818,13 @@ export function ConnectedWorkspace() {
                             </button>
                           );
                         })}
-                      {!!data.suppliers.length &&
-                        data.health.every(
-                          (row) => row.status === "complete",
-                        ) && (
+                      {!!data.metrics.suppliers && data.metrics.complete === data.metrics.suppliers && (
                           <p className="quiet-note">
                             Every connection is complete. Your network is up to
                             date.
                           </p>
                         )}
-                      {!data.suppliers.length && (
+                      {!data.metrics.suppliers && (
                         <EmptyState
                           title="Your first connection."
                           description="Add a supplier or discover a registered company to begin."
@@ -939,8 +838,8 @@ export function ConnectedWorkspace() {
                           }
                         />
                       )}
-                    </section>
-                    <section className="connected-panel">
+                    </section>}
+                    {widgets.includes("activity") && <section className="connected-panel">
                       <h2>Moving, together.</h2>
                       {data.events.length ? (
                         data.events.slice(0, 5).map((event) => (
@@ -960,7 +859,7 @@ export function ConnectedWorkspace() {
                           makes progress.
                         </p>
                       )}
-                      <div className="connected-next">
+                      {widgets.includes("privacy") && <div className="connected-next">
                         <ShieldCheck size={21} />
                         <strong>Private by company.</strong>
                         <p>
@@ -970,11 +869,14 @@ export function ConnectedWorkspace() {
                         <Link to={`/cloud?view=settings&org=${data.org.id}`}>
                           Review your settings <ArrowUpRight size={15} />
                         </Link>
-                      </div>
-                    </section>
+                      </div>}
+                    </section>}
                   </div>
+                  {!widgets.includes("activity") && widgets.includes("privacy") && <section className="connected-panel"><ShieldCheck size={22}/><h2>Private by company.</h2><p className="quiet-note">Documents are shared only with the companies you choose.</p><Link className="text-link" to={`/cloud?view=settings&org=${data.org.id}`}>Review privacy settings <ArrowUpRight size={15}/></Link></section>}
+                  {!widgets.length && <EmptyState title="A little room to focus." description="Choose the information you want to see in your overview." action={<Button variant="secondary" onClick={()=>setCustomize(true)}>Add widgets</Button>}/>}
                 </>
               )}
+              {refreshing && <div className="workspace-refresh-status"><LoadingIndicator compact label="Updating workspace…"/></div>}
               {view === "suppliers" && (
                 <>
                   <div className="connected-search">
@@ -983,7 +885,7 @@ export function ConnectedWorkspace() {
                       placeholder="Search company, country or category…"
                       aria-label="Search connected suppliers"
                       value={query}
-                      onChange={(event) => setQuery(event.target.value)}
+                      onChange={(event) => {setQuery(event.target.value);setParams(previous=>{const next=new URLSearchParams(previous);next.delete("page");return next;},{replace:true});}}
                     />
                     <span>{shownSuppliers.length} in view</span>
                   </div>
@@ -1488,9 +1390,16 @@ export function ConnectedWorkspace() {
               {view === "settings" && (
                 <form
                   key={data.org.id}
+                  onChange={()=>setSettingsDirty(true)}
                   className="connected-settings"
                   onSubmit={saveSettings}
                 >
+                  <section className="connected-panel settings-appearance">
+                    <p className="eyebrow">YOUR EXPERIENCE</p><h2>Light. Dark. Yours.</h2><p>Choose how Relay looks on this device.</p>
+                    <div className="theme-options" role="group" aria-label="Workspace appearance">
+                      {([{id:"light",label:"Light",icon:Sun},{id:"dark",label:"Dark",icon:Moon},{id:"system",label:"System",icon:Monitor}] as const).map(({id,label,icon:Icon})=><button type="button" key={id} aria-pressed={preference===id} onClick={()=>setPreference(id)}><Icon size={22}/><strong>{label}</strong><small>{id==="system"?"Follow your device":`${label} appearance`}</small></button>)}
+                    </div>
+                  </section>
                   <section className="connected-panel">
                     <h2>Your company identity.</h2>
                     <p>
@@ -1504,7 +1413,7 @@ export function ConnectedWorkspace() {
                           required
                           maxLength={160}
                           defaultValue={data.org.legal_name}
-                          disabled={!manager}
+                          disabled={!manager || busy}
                         />
                       </label>
                       <label>
@@ -1514,7 +1423,7 @@ export function ConnectedWorkspace() {
                           pattern="[A-Za-z]{2}"
                           maxLength={2}
                           defaultValue={data.org.country_code}
-                          disabled={!manager}
+                          disabled={!manager || busy}
                           placeholder="AT"
                         />
                       </label>
@@ -1524,16 +1433,18 @@ export function ConnectedWorkspace() {
                           name="registration_number"
                           maxLength={100}
                           defaultValue={data.org.registration_number}
-                          disabled={!manager}
+                          disabled={!manager || busy}
                         />
                       </label>
                       <label>
                         Website
                         <Input
                           name="website"
+                          type="url"
+                          placeholder="https://your-company.com"
                           maxLength={255}
                           defaultValue={data.org.website}
-                          disabled={!manager}
+                          disabled={!manager || busy}
                         />
                       </label>
                     </div>
@@ -1543,7 +1454,7 @@ export function ConnectedWorkspace() {
                         name="description"
                         maxLength={1000}
                         defaultValue={data.directory?.description || ""}
-                        disabled={!manager}
+                        disabled={!manager || busy}
                         rows={3}
                       />
                     </label>
@@ -1563,30 +1474,29 @@ export function ConnectedWorkspace() {
                         name="listed"
                         type="checkbox"
                         defaultChecked={data.directory?.listed || false}
-                        disabled={!manager}
+                        disabled={!manager || busy}
                       />
                     </label>
                     <label className="settings-switch">
                       <span>
                         <strong>Email updates</strong>
                         <small>
-                          Your preference is saved. Email delivery awaits your
-                          company's sender configuration.
+                          Save your preference for future workspace updates. Automatic team and supplier emails are not active yet. Sign-in emails are sent separately.
                         </small>
                       </span>
                       <input
                         name="email_updates"
                         type="checkbox"
                         defaultChecked={data.settings?.email_updates !== false}
-                        disabled={!manager}
+                        disabled={!manager || busy}
                       />
                     </label>
                   </section>
                   {manager ? (
-                    <Button type="submit" disabled={busy}>
-                      {busy ? <LoadingIndicator compact label="Saving…" /> : "Save settings"}
+                    <div className="settings-save-actions"><Button type="submit" disabled={busy || !settingsDirty}>
+                      {busy ? <LoadingIndicator compact label="Saving…" /> : settingsDirty ? "Save changes" : "All changes saved"}
                       <Check size={16} />
-                    </Button>
+                    </Button><Button type="button" variant="ghost" disabled={busy || !settingsDirty} onClick={event=>{event.currentTarget.form?.reset();setSettingsDirty(false);}}>Discard changes</Button></div>
                   ) : (
                     <p className="quiet-note">
                       An owner or administrator can update company settings.
@@ -1594,9 +1504,9 @@ export function ConnectedWorkspace() {
                   )}
                   <section className="connected-panel">
                     <h2>Your account.</h2>
-                    <p>{data.user.email}</p>
+                    <div className="settings-account"><span className="user-avatar">{data.user.email?.[0]?.toUpperCase()}</span><div><strong>{data.user.email}</strong><small>{data.role === "owner" ? "Company workspace owner" : data.role === "admin" ? "Company administrator" : "Workspace member"}</small></div><Badge>{data.user.email_confirmed_at?"Email verified":"Email unconfirmed"}</Badge></div><p>Your company role controls access to this workspace. It does not grant RELAY platform administration.</p>
                     <Link className="text-link" to="/account-security">
-                      Password and account security <ArrowUpRight size={15} />
+                      Sign-in and account security <ArrowUpRight size={15} />
                     </Link>
                   </section>
                 </form>
@@ -1624,6 +1534,7 @@ export function ConnectedWorkspace() {
                   )}
                 </div>
               )}
+              {["suppliers","documents","requests","products","team","activity"].includes(view) && data.total>50 && <PageControls page={page} total={data.total} busy={refreshing} onChange={next=>setParams({view,org:data.org.id,page:String(next)})}/>}
             </MotionPanel>
           )}
         </main>
@@ -1632,6 +1543,11 @@ export function ConnectedWorkspace() {
           <span>A product of VOVERE</span>
         </footer>
       </div>
+      <Dialog open={customize} onClose={()=>setCustomize(false)} title="Your view. Your priorities.">
+        <p>Choose which widgets appear in your overview. Saved for this company and account on this device.</p>
+        {[{id:"network",label:"Network summary",description:"Company-wide supplier, profile, document and request totals."},{id:"attention",label:"Needs attention",description:"Connections with missing information or upcoming deadlines."},{id:"activity",label:"Recent activity",description:"The latest changes in your workspace."},{id:"privacy",label:"Privacy reminder",description:"A direct route to your company visibility settings."}].map(widget=><label className="settings-switch" key={widget.id}><span><strong>{widget.label}</strong><small>{widget.description}</small></span><input type="checkbox" checked={widgets.includes(widget.id)} onChange={event=>updateWidgets(event.target.checked?[...widgets,widget.id]:widgets.filter(id=>id!==widget.id))}/></label>)}
+        <Button variant="secondary" onClick={()=>updateWidgets(["network","attention","activity","privacy"])}>Restore default layout</Button>
+      </Dialog>
       <Dialog
         open={!!supplier}
         onClose={() => {
@@ -1663,6 +1579,7 @@ export function ConnectedWorkspace() {
               </p>
             )}
             <MotionPanel identity={`${supplier.id}-${detailTab}`} compact>
+              {refreshing && <LoadingIndicator compact label="Updating details…"/>}
               {detailTab === "Company" && (
                 <form className="workspace-form" onSubmit={saveSupplier}>
                   <label>
@@ -1890,6 +1807,7 @@ export function ConnectedWorkspace() {
                 </>
               )}
             </MotionPanel>
+            {data.detailTotal>50 && <PageControls page={detailPage} total={data.detailTotal} busy={refreshing} onChange={setDetailPage}/>}
           </>
         )}
       </Dialog>
@@ -1994,6 +1912,7 @@ export function ConnectedWorkspace() {
                 </>
               ) : dialog === "share" ? (
                 <>
+                  <label>Find a recipient<Input type="search" value={directoryQuery} onChange={event=>setDirectoryQuery(event.target.value)} placeholder="Search registered companies…"/></label>
                   <label>
                     Recipient company
                     <Select name="recipient" required>
@@ -2012,6 +1931,8 @@ export function ConnectedWorkspace() {
                         ))}
                     </Select>
                   </label>
+                  <label>Find documents<Input type="search" value={lookupQuery} onChange={event=>setLookupQuery(event.target.value)} placeholder="Search document names…"/></label>
+                  <p className="quiet-note">{shareIds.length} documents selected. Search to find older files; your selection is retained.</p>
                   <fieldset className="share-document-options">
                     <legend>Choose documents to share</legend>
                     {data.documents.map((doc) => (
@@ -2020,6 +1941,8 @@ export function ConnectedWorkspace() {
                           type="checkbox"
                           name="documents"
                           value={doc.id}
+                          checked={shareIds.includes(doc.id)}
+                          onChange={event=>setShareIds(event.target.checked?[...shareIds,doc.id]:shareIds.filter(id=>id!==doc.id))}
                         />
                         <span>{doc.name}</span>
                       </label>
@@ -2032,10 +1955,12 @@ export function ConnectedWorkspace() {
                 </>
               ) : dialog === "request" ? (
                 <>
+                  <label>Find a supplier<Input type="search" value={lookupQuery} onChange={event=>setLookupQuery(event.target.value)} placeholder="Search your suppliers…"/></label>
                   <label>
                     Supplier
-                    <Select required name="connection">
-                      {data.health.map((row) => (
+                    <Select required name="connection" disabled={refreshing}>
+                      <option value="">Choose a supplier</option>
+                      {data.health.filter(row=>data.suppliers.some(company=>company.id===row.supplier_id && company.legal_name.toLowerCase().includes(searchTerms.lookup.toLowerCase()))).map((row) => (
                         <option key={row.id} value={row.id || ""}>
                           {
                             data.suppliers.find(
@@ -2066,10 +1991,12 @@ export function ConnectedWorkspace() {
                 </>
               ) : (
                 <>
+                  <label>Find a supplier<Input type="search" value={lookupQuery} onChange={event=>setLookupQuery(event.target.value)} placeholder="Search your suppliers…"/></label>
                   <label>
                     Supplier
-                    <Select required name="supplier">
-                      {data.suppliers.map((company) => (
+                    <Select required name="supplier" disabled={refreshing}>
+                      <option value="">Choose a supplier</option>
+                      {data.suppliers.filter(company=>company.legal_name.toLowerCase().includes(searchTerms.lookup.toLowerCase())).map((company) => (
                         <option key={company.id} value={company.id}>
                           {company.legal_name}
                         </option>
@@ -2234,4 +2161,7 @@ function CertificateForm({
       </Button>
     </form>
   );
+}
+function PageControls({page,total,busy,onChange}:{page:number;total:number;busy:boolean;onChange:(page:number)=>void}){
+ return <nav className="connected-pagination" aria-label="Results pagination"><span>Page {page+1} of {Math.ceil(total/50)}</span><div><Button variant="secondary" type="button" disabled={busy || page===0} onClick={()=>onChange(page-1)}>Previous</Button><Button variant="secondary" type="button" disabled={busy || (page+1)*50>=total} onClick={()=>onChange(page+1)}>Next</Button></div></nav>;
 }
