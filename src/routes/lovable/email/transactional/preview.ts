@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { render } from '@react-email/render'
 import { createFileRoute } from '@tanstack/react-router'
-import { TEMPLATES } from '@/lib/email-templates/registry'
+import { TEMPLATES } from '../../../../lib/email-templates/registry'
 
 // Renders all registered templates with their previewData.
 // Gated by LOVABLE_API_KEY — only the Go API calls this.
