@@ -20,7 +20,7 @@ export function Select({ children, className = '', value, defaultValue, onChange
   setOptions(Array.from(select.options, o => ({value:o.value,label:o.text,disabled:o.disabled})));
   setCurrent(select.value);
   setLabel(Array.from(select.labels ?? []).map(label => Array.from(label.childNodes).filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.textContent).join(' ').trim()).join(' '));
-  const reset = () => requestAnimationFrame(() => setCurrent(select.value));
+  const reset = () => { setInvalid(false); setOpen(false); requestAnimationFrame(() => setCurrent(select.value)); };
   select.form?.addEventListener('reset', reset);
   return () => select.form?.removeEventListener('reset', reset);
  }, [children, value, defaultValue]);

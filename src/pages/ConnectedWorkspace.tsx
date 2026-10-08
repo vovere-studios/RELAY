@@ -19,11 +19,8 @@ import {
   Download,
   LogOut,
   RefreshCw,
-  Plus,
   Search,
   Check,
-  Link2,
-  Copy,
   ShieldCheck,
   Bell,
   Menu,
@@ -33,9 +30,10 @@ import {
   Sun,
   Moon,
   Monitor,
-  SlidersHorizontal,
+  ChevronRight,
 } from "lucide-react";
 import { useTheme } from "../lib/theme";
+import { ActionButton, ActionIcon, useActionFeedback } from "../components/ActionFeedback";
 import { requireSupabase } from "../lib/supabase";
 import {
   workspaceAction,
@@ -134,6 +132,16 @@ const titles: Record<string, [string, string]> = {
     "Company identity, visibility and workspace preferences.",
   ],
 };
+function actionKey(name: string, payload: Record<string, unknown> = {}) {
+  return `${name}:${String(payload.id || payload.company_id || payload.user_id || "")}`;
+}
+function focusInvalidField(form: HTMLFormElement) {
+  requestAnimationFrame(() => {
+    const field = form.querySelector<HTMLElement>('.select-trigger[aria-invalid="true"], input:invalid:not([type="hidden"]), textarea:invalid');
+    field?.closest("label")?.scrollIntoView({block:"nearest"});
+    field?.focus({preventScroll:true});
+  });
+}
 function field(form: FormData, name: string) {
   return String(form.get(name) || "").trim();
 }
@@ -150,6 +158,8 @@ const healthStatus = (health?: Health) =>
 export function ConnectedWorkspace() {
   const navigate = useNavigate();
   const notify = useFeedback();
+  const feedback = useActionFeedback();
+  const [layoutSaved, setLayoutSaved] = useState(true);
   const [params, setParams] = useSearchParams();
   const view = sections.some((section) => section.id === params.get("view"))
     ? params.get("view")!
@@ -172,6 +182,7 @@ export function ConnectedWorkspace() {
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [menu, setMenu] = useState(false);
+  const [confirmation, setConfirmation] = useState<{id: string; title: string; description: string; label: string; run: () => Promise<unknown>} | null>(null);
   const [dialog, setDialog] = useState<
     | "supplier"
     | "document"
@@ -196,7 +207,17 @@ export function ConnectedWorkspace() {
     if(!data)return;
     try{const value=JSON.parse(localStorage.getItem(`relay-overview-${data.user.id}-${data.org.id}`)||"null");setWidgets(Array.isArray(value)?value.filter(item=>["network","attention","activity","privacy"].includes(item)):["network","attention","activity","privacy"]);}catch{setWidgets(["network","attention","activity","privacy"]);}
   },[data?.org.id,data?.user.id]);
-  function updateWidgets(next:string[]){setWidgets(next);if(data)try{localStorage.setItem(`relay-overview-${data.user.id}-${data.org.id}`,JSON.stringify(next));}catch{notify("Layout changed.","Browser storage is unavailable, so this preference will not survive a reload.");}}
+  function updateWidgets(next: string[]) {
+    setWidgets(next);
+    if (!data) return;
+    try {
+      localStorage.setItem(`relay-overview-${data.user.id}-${data.org.id}`, JSON.stringify(next));
+      setLayoutSaved(true);
+    } catch {
+      setLayoutSaved(false);
+      notify("Layout changed on this page.", "Browser storage is unavailable. This preference will not survive a reload.", "info");
+    }
+  }
   const load = useCallback(async () => {
     requestController.current?.abort();
     const controller = new AbortController();
@@ -256,6 +277,7 @@ export function ConnectedWorkspace() {
     setMenu(false);
     setSelected(null);
     setGenerated("");
+    setConfirmation(null);
   }, [view, orgParam]);
   useEffect(() => {
     if (view !== "directory" && dialog !== "share") return;
@@ -316,12 +338,19 @@ export function ConnectedWorkspace() {
       if (before?.isConnected) before.focus();
     };
   }, [menu]);
+  function invalidForm(event: FormEvent<HTMLFormElement>, id: string) {
+    event.preventDefault();
+    feedback.fail(id);
+    setError("Check the highlighted fields before saving.");
+    focusInvalidField(event.currentTarget);
+  }
   async function action(
     name: string,
     payload: Record<string, string | boolean | null | string[]> = {},
     success = "Changes saved.",
   ) {
-    if (!data) return;
+    const feedbackId = actionKey(name, payload);
+    if (!data || busy || !feedback.begin(feedbackId)) return;
     setBusy(true);
     setError("");
     try {
@@ -329,16 +358,20 @@ export function ConnectedWorkspace() {
         organization_id: data.org.id,
         ...payload,
       });
+      feedback.succeed(feedbackId);
       notify(success);
       await load();
       return result;
     } catch (error) {
+      feedback.fail(feedbackId);
       setError(errorMessage(error));
+      notify("Changes not saved.", errorMessage(error), "error");
     } finally {
       setBusy(false);
     }
   }
   function openDialog(next: typeof dialog) {
+    feedback.reset("dialog");
     setError("");
     setGenerated("");
     setLookupQuery("");
@@ -346,11 +379,14 @@ export function ConnectedWorkspace() {
     setDialog(next);
   }
   async function copy(url: string) {
+    if (!feedback.begin("copy")) return;
     try {
       await navigator.clipboard.writeText(url);
+      feedback.succeed("copy");
       notify("Link copied.", "Share it with the intended recipient.");
     } catch {
-      notify("Select and copy the link.", "Clipboard access is unavailable.");
+      feedback.fail("copy");
+      notify("Select and copy the link.", "Clipboard access is unavailable.", "info");
     }
   }
   async function createLink(
@@ -358,7 +394,8 @@ export function ConnectedWorkspace() {
     requestId?: string,
     title = "Send your company documents",
   ) {
-    if (!data) return;
+    const feedbackId = `upload-link:${requestId || supplierId}`;
+    if (!data || busy || !feedback.begin(feedbackId)) return;
     setBusy(true);
     setError("");
     try {
@@ -369,12 +406,14 @@ export function ConnectedWorkspace() {
         title,
       });
       setGenerated(privateLink("submit", result.token));
+      feedback.succeed(feedbackId);
       await load();
       notify(
         "Upload link created.",
         "Valid for fourteen days. Up to five documents.",
       );
     } catch (error) {
+      feedback.fail(feedbackId);
       setError(errorMessage(error));
     } finally {
       setBusy(false);
@@ -384,12 +423,13 @@ export function ConnectedWorkspace() {
     try {
       await downloadPrivate(path, name);
     } catch (error) {
-      notify("Download unavailable.", errorMessage(error));
+      notify("Download unavailable.", errorMessage(error), "error");
     }
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!data) return;
+    if (!data || busy || !feedback.begin("dialog")) return;
+    const submittedDialog = dialog;
     const form = new FormData(event.currentTarget);
     setBusy(true);
     setError("");
@@ -465,8 +505,8 @@ export function ConnectedWorkspace() {
           email: field(form, "email"),
           role: field(form, "role"),
         });
-        setGenerated(privateLink("join", result.token));
-        await load();
+        feedback.succeed("dialog", () => setGenerated(privateLink("join", result.token)));
+        void load();
         notify(
           "Invitation created.",
           "Copy the invitation link for your colleague.",
@@ -479,16 +519,17 @@ export function ConnectedWorkspace() {
           recipient_id: field(form, "recipient"),
           document_ids: shareIds,
         });
-      setDialog(null);
-      await load();
+      feedback.succeed("dialog", () => setDialog(current => current === submittedDialog ? null : current));
+      void load();
       notify(
-        dialog === "share"
+        submittedDialog === "share"
           ? "Documents shared."
-          : dialog === "request"
+          : submittedDialog === "request"
             ? "Request created."
             : "Saved to your workspace.",
       );
     } catch (error) {
+      feedback.fail("dialog");
       setError(errorMessage(error));
     } finally {
       setBusy(false);
@@ -514,7 +555,7 @@ export function ConnectedWorkspace() {
   }
   async function saveSupplier(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!data || !selected) return;
+    if (!data || !selected || busy || !feedback.begin("supplier")) return;
     const form = new FormData(event.currentTarget);
     setBusy(true);
     setError("");
@@ -536,9 +577,11 @@ export function ConnectedWorkspace() {
           .eq("organization_id", data.org.id)
           .eq("id", selected),
       );
+      feedback.succeed("supplier");
       await load();
       notify("Company information saved.");
     } catch (error) {
+      feedback.fail("supplier");
       setError(errorMessage(error));
     } finally {
       setBusy(false);
@@ -565,10 +608,7 @@ export function ConnectedWorkspace() {
           value={generated}
           onFocus={(event) => event.currentTarget.select()}
         />
-        <Button variant="secondary" onClick={() => void copy(generated)}>
-          <Copy size={16} />
-          Copy
-        </Button>
+        <ActionButton variant="secondary" phase={feedback.phase("copy")} label="Copy link" pendingLabel="Copying…" successLabel="Copied" onClick={() => void copy(generated)}/>
       </div>
       <a href={generated} target="_blank" rel="noopener noreferrer">
         Preview the link <ArrowUpRight size={14} />
@@ -725,7 +765,7 @@ export function ConnectedWorkspace() {
                     )
                   }
                 >
-                  <Plus size={16} />
+                  <ActionIcon kind={view === "documents" ? "upload" : view === "requests" ? "request" : "add"}/>
                   {view === "documents"
                     ? "Upload document"
                     : view === "requests"
@@ -759,7 +799,7 @@ export function ConnectedWorkspace() {
             <MotionPanel identity={`${data.org.id}-${view}`} compact>
               {view === "overview" && (
                 <>
-                  <div className="overview-tools"><span className="quiet-note">Your workspace at a glance.</span><Button variant="ghost" onClick={()=>setCustomize(true)}><SlidersHorizontal size={16}/>Customize overview</Button></div>
+                  <div className="overview-tools"><span className="quiet-note">Your workspace at a glance.</span><Button variant="ghost" onClick={()=>setCustomize(true)}><ActionIcon kind="adjust"/>Customize overview</Button></div>
                   {widgets.includes("network") && <div className="connected-metrics">
                     {[
                       [data.metrics.suppliers, "Connected companies"],
@@ -814,7 +854,7 @@ export function ConnectedWorkspace() {
                                 </small>
                               </span>
                               <Status status={healthStatus(row)} />
-                              <ArrowUpRight size={16} />
+                              <ChevronRight className="attention-chevron" size={17} />
                             </button>
                           );
                         })}
@@ -1044,7 +1084,7 @@ export function ConnectedWorkspace() {
                                   Shared {dateLabel(share.shared_at)}
                                 </small>
                               </div>
-                              <Button
+                              <ActionButton
                                 variant="secondary"
                                 disabled={busy}
                                 onClick={() =>
@@ -1054,9 +1094,7 @@ export function ConnectedWorkspace() {
                                     "Document access revoked.",
                                   )
                                 }
-                              >
-                                Revoke access
-                              </Button>
+                                phase={feedback.phase(actionKey("revoke_share", {id:share.id}))} label="Revoke access" pendingLabel="Updating…" successLabel="Access revoked"/>
                             </div>
                           ))}
                       </section>
@@ -1096,20 +1134,8 @@ export function ConnectedWorkspace() {
                               : "Awaiting response"}
                           </Badge>
                           {manager && company && (
-                            <Button
-                              variant="secondary"
-                              disabled={busy}
-                              onClick={() =>
-                                void createLink(
-                                  company.id,
-                                  request.id,
-                                  request.title,
-                                )
-                              }
-                            >
-                              <Link2 size={15} />
-                              Create upload link
-                            </Button>
+                            <ActionButton variant="secondary" disabled={busy} label="Create upload link" pendingLabel="Creating…" successLabel="Link created"
+                              phase={feedback.phase(`upload-link:${request.id}`)} onClick={()=>void createLink(company.id,request.id,request.title)}/>
                           )}
                         </div>
                       );
@@ -1141,7 +1167,7 @@ export function ConnectedWorkspace() {
                                 : "Active"}
                           </Badge>
                           {!link.revoked_at && (
-                            <Button
+                            <ActionButton
                               variant="ghost"
                               disabled={busy}
                               onClick={() =>
@@ -1151,9 +1177,7 @@ export function ConnectedWorkspace() {
                                   "Upload link revoked.",
                                 )
                               }
-                            >
-                              Revoke
-                            </Button>
+                                phase={feedback.phase(actionKey("revoke_link", {id:link.id}))} label="Revoke" pendingLabel="Updating…" successLabel="Link revoked"/>
                           )}
                         </div>
                       ))}
@@ -1232,7 +1256,7 @@ export function ConnectedWorkspace() {
                           <span>
                             {company.country_code || "Registered company"}
                           </span>
-                          <Button
+                          <ActionButton
                             variant="secondary"
                             disabled={
                               busy ||
@@ -1250,16 +1274,10 @@ export function ConnectedWorkspace() {
                                 "Company connected.",
                               )
                             }
-                          >
-                            {data.suppliers.some(
-                              (supplier) =>
-                                supplier.source_organization_id ===
-                                company.organization_id,
-                            )
-                              ? "Connected"
-                              : "Connect company"}
-                            <ArrowUpRight size={15} />
-                          </Button>
+                            phase={feedback.phase(actionKey("connect_company", {company_id:company.organization_id}))}
+                            label={data.suppliers.some(supplier=>supplier.source_organization_id === company.organization_id) ? "Connected" : "Connect company"}
+                            pendingLabel="Connecting…" successLabel="Company connected"/>
+
                         </article>
                       ))}
                   </div>
@@ -1316,16 +1334,10 @@ export function ConnectedWorkspace() {
                             variant="ghost"
                             disabled={busy}
                             onClick={() => {
-                              if (
-                                window.confirm(
-                                  `Remove ${member.email} from this workspace?`,
-                                )
-                              )
-                                void action(
-                                  "member_role",
-                                  { user_id: member.id, role: "remove" },
-                                  "Team access removed.",
-                                );
+                              const id = actionKey("member_role", {user_id:member.id});
+                              feedback.reset(id);
+                              setError("");
+                              setConfirmation({id,title:"Remove workspace access.",description:`${member.email} will lose access to this company workspace. Their account remains available. You can invite them again later.`,label:"Remove access",run:()=>action("member_role",{user_id:member.id,role:"remove"},"Team access removed.")});
                             }}
                           >
                             Remove
@@ -1356,7 +1368,7 @@ export function ConnectedWorkspace() {
                                   : "Pending"}
                           </Badge>
                           {!invite.accepted_by && !invite.revoked_at && (
-                            <Button
+                            <ActionButton
                               variant="ghost"
                               disabled={busy}
                               onClick={() =>
@@ -1366,9 +1378,7 @@ export function ConnectedWorkspace() {
                                   "Invitation revoked.",
                                 )
                               }
-                            >
-                              Revoke
-                            </Button>
+                                phase={feedback.phase(actionKey("revoke_invite", {id:invite.id}))} label="Revoke" pendingLabel="Updating…" successLabel="Invitation revoked"/>
                           )}
                         </div>
                       ))}
@@ -1390,9 +1400,10 @@ export function ConnectedWorkspace() {
               {view === "settings" && (
                 <form
                   key={data.org.id}
-                  onChange={()=>setSettingsDirty(true)}
+                  onChange={()=>{setSettingsDirty(true);feedback.reset("settings:");setError("");}}
                   className="connected-settings"
                   onSubmit={saveSettings}
+                  onInvalidCapture={event=>invalidForm(event,"settings:")}
                 >
                   <section className="connected-panel settings-appearance">
                     <p className="eyebrow">YOUR EXPERIENCE</p><h2>Light. Dark. Yours.</h2><p>Choose how Relay looks on this device.</p>
@@ -1473,6 +1484,7 @@ export function ConnectedWorkspace() {
                       <input
                         name="listed"
                         type="checkbox"
+                        role="switch"
                         defaultChecked={data.directory?.listed || false}
                         disabled={!manager || busy}
                       />
@@ -1487,16 +1499,15 @@ export function ConnectedWorkspace() {
                       <input
                         name="email_updates"
                         type="checkbox"
+                        role="switch"
                         defaultChecked={data.settings?.email_updates !== false}
                         disabled={!manager || busy}
                       />
                     </label>
                   </section>
                   {manager ? (
-                    <div className="settings-save-actions"><Button type="submit" disabled={busy || !settingsDirty}>
-                      {busy ? <LoadingIndicator compact label="Saving…" /> : settingsDirty ? "Save changes" : "All changes saved"}
-                      <Check size={16} />
-                    </Button><Button type="button" variant="ghost" disabled={busy || !settingsDirty} onClick={event=>{event.currentTarget.form?.reset();setSettingsDirty(false);}}>Discard changes</Button></div>
+                    <div className="settings-save-actions"><ActionButton type="submit" phase={feedback.phase("settings:")} disabled={busy || !settingsDirty} label={settingsDirty ? "Save changes" : "All changes saved"} successLabel="Changes saved"/>
+                      <Button type="button" variant="ghost" disabled={busy || !settingsDirty} onClick={event=>{event.currentTarget.form?.reset();setSettingsDirty(false);feedback.reset("settings:");setError("");}}>Discard changes</Button></div>
                   ) : (
                     <p className="quiet-note">
                       An owner or administrator can update company settings.
@@ -1543,13 +1554,44 @@ export function ConnectedWorkspace() {
           <span>A product of VOVERE</span>
         </footer>
       </div>
-      <Dialog open={customize} onClose={()=>setCustomize(false)} title="Your view. Your priorities.">
-        <p>Choose which widgets appear in your overview. Saved for this company and account on this device.</p>
-        {[{id:"network",label:"Network summary",description:"Company-wide supplier, profile, document and request totals."},{id:"attention",label:"Needs attention",description:"Connections with missing information or upcoming deadlines."},{id:"activity",label:"Recent activity",description:"The latest changes in your workspace."},{id:"privacy",label:"Privacy reminder",description:"A direct route to your company visibility settings."}].map(widget=><label className="settings-switch" key={widget.id}><span><strong>{widget.label}</strong><small>{widget.description}</small></span><input type="checkbox" checked={widgets.includes(widget.id)} onChange={event=>updateWidgets(event.target.checked?[...widgets,widget.id]:widgets.filter(id=>id!==widget.id))}/></label>)}
-        <Button variant="secondary" onClick={()=>updateWidgets(["network","attention","activity","privacy"])}>Restore default layout</Button>
+      <Dialog closeDisabled={busy} open={!!confirmation} onClose={()=>{if(!busy){if(confirmation)feedback.reset(confirmation.id);setConfirmation(null);}}} title={confirmation?.title || "Confirm your action."}>
+        {confirmation && <div className="workspace-form"><p>{confirmation.description}</p>
+          {error && <p className="form-feedback-error" role="alert"><X size={15}/><span>{error}</span></p>}
+          <div className="confirmation-actions"><Button variant="secondary" disabled={busy} onClick={()=>{feedback.reset(confirmation.id);setConfirmation(null);}}>Keep access</Button>
+            <ActionButton label={confirmation.label} phase={feedback.phase(confirmation.id)} pendingLabel="Updating…" successLabel="Access removed" disabled={busy} onClick={()=>{const target=confirmation;void target.run().then(saved=>{if(saved)feedback.succeed(target.id,()=>setConfirmation(null));});}}/>
+          </div>
+        </div>}
+      </Dialog>
+      <Dialog open={customize} onClose={()=>setCustomize(false)} title="Your view. Your priorities." className="customize-dialog"
+        footer={<><Button variant="ghost" onClick={()=>updateWidgets(["network","attention","activity","privacy"])}>Restore defaults</Button><Button onClick={()=>setCustomize(false)}>Done</Button></>}>
+        <p className="customize-intro">Choose what matters at a glance. Your layout is remembered for this workspace on this device.</p>
+        <div className="customize-layout">
+          <div className="customize-preview" aria-hidden="true">
+            <span className="customize-preview-label">Your overview</span>
+            <div className="customize-preview-window"><div className="customize-preview-bar"><span>relay</span><i/><i/><i/></div>
+              <div className="customize-preview-content"><strong>Your network.<br/>In focus.</strong>
+                <div className="customize-preview-block" data-visible={widgets.includes("network")}><div className="customize-preview-metrics"><span><b>{data?.metrics.suppliers || 0}</b>Companies</span><span><b>{data?.metrics.documents || 0}</b>Documents</span></div></div>
+                <div className="customize-preview-block" data-visible={widgets.includes("attention")}><div><div className="customize-preview-card"><Bell size={12}/><span>Needs attention</span><div className="customize-preview-line"/><div className="customize-preview-line"/></div></div></div></div>
+                <div className="customize-preview-block" data-visible={widgets.includes("activity")}><div><div className="customize-preview-card"><Activity size={12}/><span>Recent activity</span><div className="customize-preview-line"/></div></div>
+                <div className="customize-preview-block" data-visible={widgets.includes("privacy")}><div><div className="customize-preview-privacy"><ShieldCheck size={12}/><span>Private by company.</span></div></div></div>
+                {!widgets.length && <span className="customize-preview-empty">A little space.<br/>Made for you.</span>}
+              </div>
+            </div>
+            <p>Your choices, reflected live.</p>
+          </div>
+          <div className="customize-widget-list">
+          {[{id:"network",label:"Network summary",description:"Supplier, profile, document and request totals.",icon:LayoutGrid},{id:"attention",label:"Needs attention",description:"Connections with missing information or deadlines.",icon:Bell},{id:"activity",label:"Recent activity",description:"The latest changes in your workspace.",icon:Activity},{id:"privacy",label:"Privacy reminder",description:"A direct route to your visibility settings.",icon:ShieldCheck}].map(({icon:Icon,...widget})=><label className="settings-switch" key={widget.id}>
+            <span className="customize-widget-icon" aria-hidden="true"><Icon size={17} strokeWidth={1.6}/></span>
+            <span><strong>{widget.label}</strong><small>{widget.description}</small></span>
+            <input type="checkbox" role="switch" aria-label={widget.label} checked={widgets.includes(widget.id)} onChange={event=>updateWidgets(event.target.checked?[...widgets,widget.id]:widgets.filter(id=>id!==widget.id))}/>
+          </label>)}
+          </div>
+        </div>
+        <div className="layout-saved" role="status">{layoutSaved ? <><Check size={13}/>Saved on this device</> : "Changes apply to this page only"}</div>
       </Dialog>
       <Dialog
         open={!!supplier}
+        closeDisabled={busy}
         onClose={() => {
           if (!busy) {
             setSelected(null);
@@ -1581,7 +1623,7 @@ export function ConnectedWorkspace() {
             <MotionPanel identity={`${supplier.id}-${detailTab}`} compact>
               {refreshing && <LoadingIndicator compact label="Updating details…"/>}
               {detailTab === "Company" && (
-                <form className="workspace-form" onSubmit={saveSupplier}>
+                <form className="workspace-form" onSubmit={saveSupplier} onInvalidCapture={event=>invalidForm(event,"supplier")} aria-busy={feedback.phase("supplier") === "pending"} onChange={()=>{feedback.reset("supplier");setError("");}}>
                   <label>
                     Company name
                     <Input
@@ -1646,9 +1688,7 @@ export function ConnectedWorkspace() {
                     />
                   </label>
                   {manager && (
-                    <Button disabled={busy} type="submit">
-                      Save company information <Check size={15} />
-                    </Button>
+                    <ActionButton disabled={busy} type="submit" phase={feedback.phase("supplier")} label="Save company information" successLabel="Company information saved"/>
                   )}
                 </form>
               )}
@@ -1684,13 +1724,8 @@ export function ConnectedWorkspace() {
                     (doc) => doc.supplier_id === supplier.id,
                   ) && <p className="quiet-note">No documents received yet.</p>}
                   {manager && (
-                    <Button
-                      variant="secondary"
-                      disabled={busy}
-                      onClick={() => void createLink(supplier.id)}
-                    >
-                      Create upload link <Link2 size={16} />
-                    </Button>
+                    <ActionButton variant="secondary" disabled={busy} label="Create upload link" pendingLabel="Creating…" successLabel="Link created"
+                      phase={feedback.phase(`upload-link:${supplier.id}`)} onClick={() => void createLink(supplier.id)}/>
                   )}
                   {generatedCard}
                 </>
@@ -1757,16 +1792,10 @@ export function ConnectedWorkspace() {
                                   </option>
                                 ))}
                             </Select>
-                            <Button
-                              type="submit"
-                              variant="secondary"
-                              disabled={busy}
-                            >
-                              {requirement.status === "satisfied"
-                                ? "Mark missing"
-                                : "Mark complete"}
-                              <Check size={15} />
-                            </Button>
+                            <ActionButton type="submit" variant="secondary" disabled={busy}
+                              phase={feedback.phase(actionKey("review_requirement", {id:requirement.id}))}
+                              label={requirement.status === "satisfied" ? "Mark missing" : "Mark complete"}
+                              successLabel="Requirement updated"/>
                           </>
                         )}
                       </form>
@@ -1813,8 +1842,9 @@ export function ConnectedWorkspace() {
       </Dialog>
       <Dialog
         open={dialog !== null}
+        closeDisabled={busy}
         onClose={() => {
-          if (!busy) setDialog(null);
+          if (!busy) { feedback.reset("dialog"); setDialog(null); }
         }}
         title={
           dialog === "invite"
@@ -1854,7 +1884,10 @@ export function ConnectedWorkspace() {
           ) : dialog === "invite" && generated ? (
             generatedCard
           ) : (
-            <form className="workspace-form" onSubmit={submit}>
+            <form className="workspace-form" onSubmit={submit} aria-busy={feedback.phase("dialog") === "pending"}
+              onChange={()=>{feedback.reset("dialog");setError("");}}
+              onInvalidCapture={event=>invalidForm(event,"dialog")}>
+              <fieldset className="action-form-fields" disabled={busy || feedback.phase("dialog") === "success"}>
               {dialog === "supplier" ? (
                 <>
                   <label>
@@ -2041,30 +2074,14 @@ export function ConnectedWorkspace() {
                   )}
                 </>
               )}
-              {error && (
-                <p className="form-error" role="alert">
-                  {error}
-                </p>
-              )}
-              <Button
-                type="submit"
-                disabled={
-                  busy ||
-                  ((dialog === "document" ||
-                    dialog === "request" ||
-                    dialog === "product") &&
-                    !data.suppliers.length)
-                }
-              >
-                {busy
-                  ? <LoadingIndicator compact label="Saving…" />
-                  : dialog === "invite"
-                    ? "Create invitation"
-                    : dialog === "share"
-                      ? "Share selected documents"
-                      : "Save to workspace"}
-                <ArrowUpRight size={16} />
-              </Button>
+              </fieldset>
+              {error && <p className="form-feedback-error" role="alert"><X size={15}/><span>{error}</span></p>}
+              <ActionButton type="submit" phase={feedback.phase("dialog")}
+                disabled={busy || ((dialog === "document" || dialog === "request" || dialog === "product") && !data.suppliers.length)}
+                label={dialog === "invite" ? "Create invitation" : dialog === "share" ? "Share selected documents" : "Save to workspace"}
+                successLabel={dialog === "invite" ? "Invitation ready" : dialog === "share" ? "Documents shared" : dialog === "request" ? "Request created" : "Saved to workspace"}
+                pendingLabel={dialog === "document" ? "Uploading…" : "Saving…"}/>
+              <span className="sr-only" role="status">{feedback.phase("dialog") === "success" ? "Saved successfully." : ""}</span>
             </form>
           ))}
       </Dialog>
@@ -2083,10 +2100,12 @@ function CertificateForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const notify = useFeedback();
+  const feedback = useActionFeedback();
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const target = event.currentTarget;
+    if (!feedback.begin("certificate")) return;
     setBusy(true);
     setError("");
     try {
@@ -2100,17 +2119,19 @@ function CertificateForm({
         valid_from: field(form, "from"),
         valid_until: field(form, "until"),
       });
+      feedback.succeed("certificate");
       await saved();
       target.reset();
       notify("Certificate details recorded.");
     } catch (error) {
+      feedback.fail("certificate");
       setError(errorMessage(error));
     } finally {
       setBusy(false);
     }
   }
   return (
-    <form className="workspace-form certificate-record-form" onSubmit={submit}>
+    <form className="workspace-form certificate-record-form" onSubmit={submit} onChange={()=>{feedback.reset("certificate");setError("");}} onInvalidCapture={event=>{event.preventDefault();feedback.fail("certificate");setError("Check the highlighted fields before saving.");focusInvalidField(event.currentTarget);}}>
       <h3>Record certificate details.</h3>
       <label>
         Supporting certificate
@@ -2156,9 +2177,7 @@ function CertificateForm({
           {error}
         </p>
       )}
-      <Button type="submit" disabled={busy}>
-        Record certificate <Check size={15} />
-      </Button>
+      <ActionButton type="submit" disabled={busy} phase={feedback.phase("certificate")} label="Record certificate" successLabel="Certificate recorded"/>
     </form>
   );
 }

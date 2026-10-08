@@ -7,9 +7,10 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Check, X } from "lucide-react";
-type Message = { id: number; title: string; detail?: string };
-const FeedbackContext = createContext<(title: string, detail?: string) => void>(
+import { Check, Info, X } from "lucide-react";
+type Tone = "success" | "error" | "info";
+type Message = { id: number; title: string; detail?: string; tone: Tone };
+const FeedbackContext = createContext<(title: string, detail?: string, tone?: Tone) => void>(
   () => {},
 );
 function Toast({
@@ -20,10 +21,11 @@ function Toast({
   remove: (id: number) => void;
 }) {
   const [paused, setPaused] = useState(false);
+  const [hidden, setHidden] = useState(document.hidden);
   const [exiting, setExiting] = useState(false);
   const remaining = useRef(5500);
   useEffect(() => {
-    if (paused || exiting) return;
+    if (paused || hidden || exiting) return;
     const started = Date.now();
     const timer = setTimeout(() => setExiting(true), remaining.current);
     return () => {
@@ -33,7 +35,12 @@ function Toast({
         remaining.current - (Date.now() - started),
       );
     };
-  }, [paused, exiting]);
+  }, [paused, hidden, exiting]);
+  useEffect(() => {
+    const visibility = () => setHidden(document.hidden);
+    document.addEventListener("visibilitychange", visibility);
+    return () => document.removeEventListener("visibilitychange", visibility);
+  }, []);
   useEffect(() => {
     if (!exiting) return;
     const timer = setTimeout(
@@ -46,7 +53,8 @@ function Toast({
     <div className="toast-frame" data-exiting={exiting}>
       <div
         className="toast"
-        role="status"
+        data-tone={message.tone}
+        role={message.tone === "error" ? "alert" : "status"}
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={(event) =>
           setPaused(event.currentTarget.contains(document.activeElement))
@@ -58,7 +66,7 @@ function Toast({
         }}
       >
         <span className="toast-check">
-          <Check size={16} />
+          {message.tone === "success" ? <Check size={16} /> : message.tone === "error" ? <X size={16}/> : <Info size={16}/>}
         </span>
         <div>
           <strong>{message.title}</strong>
@@ -81,9 +89,9 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
       ),
     [],
   );
-  function notify(title: string, detail?: string) {
+  function notify(title: string, detail?: string, tone: Tone = "success") {
     const id = ++nextId.current;
-    setMessages((previous) => [...previous.slice(-2), { id, title, detail }]);
+    setMessages((previous) => [...previous.slice(-2), { id, title, detail, tone }]);
   }
   return (
     <FeedbackContext.Provider value={notify}>

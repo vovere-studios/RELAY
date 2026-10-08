@@ -67,3 +67,23 @@ This is NOT a concurrent load test for thousands of active users, an exhaustive 
 Private admin tables deliberately deny direct client access and have no public RLS policy. Public RPCs are security-invoker wrappers around narrowly authorized private implementations. Security advisors retain informational deny-default policy notices and the existing leaked-password-protection warning; passwordless sign-in does not remove that configuration warning. See [Supabase password security](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection).
 
 Operator-change email notifications use the existing Lovable server key and report unavailable delivery separately from saved access changes. Production delivery must be checked after publishing. Automatic registration alerts, team invitations and supplier-request emails are not implemented by this pass. Browser Back protection for unsaved SPA forms requires further review; unload, link navigation, company switching and sign-out have guards.
+
+
+## Real-workspace interaction refinement — 8 October 2026
+
+| Before | After | Why |
+| --- | --- | --- |
+| Save actions closed immediately or relied on a generic toast | Muted green confirmation/check held briefly after actual success; red retry/error state after failure | Make outcomes visible at the action itself |
+| Icons inherited the same northeast movement | Plus contracts within a ring, upload stem moves within its tray, adjustment knobs move within their tracks | Motion describes each action without travelling glyphs |
+| Dialog shell/content used one generic arrival | Material expands from the opener; content enters independently; exit returns toward the opener | Connect action and surface while keeping text undistorted |
+| Switching forms could briefly reuse the previous form DOM | Fresh body session before committing the new fields; old contents retained through exit | Prevent leaked inputs and controlled/uncontrolled warnings |
+| Customize mixed long labels with uneven control positioning | Fixed switch column, live miniature preview, fixed footer and independently scrolling body | Keep actions accessible on short displays |
+| Missing required input triggered a browser bubble | Inline field errors, first invalid field focus, retained form data | Keep validation within the product's visual system |
+| Disabled save lost keyboard focus after an error | Retry button recovers focus when the browser returns it to the body | Support retry without a pointer |
+| Toast used the same check for all messages | Semantic success/error/info and paused countdown on hidden tabs | Accurate, readable feedback |
+
+Real authenticated workspace checked: Add Supplier missing-field validation (no writes), close/reopen reset, product supplier popover, two-stage Escape handling, native focus return, Customize internal scrolling and right-column alignment. Actual workspace displayed at 907x510 CSS px in this pass; wider responsive matrix above belongs to the preceding pass. A disposable local component probe tested controlled 700ms success/failure, success hold/close, failure retention/reset/retry, sage/red presentation including dark mode. These controlled replies do not prove production database or email delivery. Fresh page/form switching produced no new console warnings after the session fix. Temporary probe source and public entry were removed before the final build.
+
+Design reference inspected read-only: current VOVERE contact dialog, submission confirmation, liquid-glass surface, signature arrow and motion source at ce0d292; live contact surface viewed without submitting. VOVERE source and website unchanged. Brand OS and Emil references were explicitly retired by the user and are no longer applied.
+
+Final verification for this interaction pass: `npm run build` completed successfully (TypeScript, client/server and Nitro bundles); `git diff --check` passed. No backend or production workspace data was altered by this pass.

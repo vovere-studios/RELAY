@@ -2,6 +2,7 @@ import {
   useEffect,
   useRef,
   useId,
+  useState,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
@@ -22,9 +23,31 @@ export function Button({
 }
 export function Input({
   className = "",
+  onInvalid,
+  onInput,
   ...props
 }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={`input ${className}`} {...props} />;
+  const [invalid, setInvalid] = useState("");
+  const messageId = useId();
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const form = input.current?.form;
+    const reset = () => setInvalid("");
+    form?.addEventListener("reset", reset);
+    return () => form?.removeEventListener("reset", reset);
+  }, []);
+  return <>
+    <input className={`input ${className}`} {...props} ref={input}
+      aria-invalid={invalid ? true : props["aria-invalid"]}
+      aria-describedby={[props["aria-describedby"], invalid ? messageId : undefined].filter(Boolean).join(" ") || undefined}
+      onInvalid={event => {
+        const validity = event.currentTarget.validity;
+        setInvalid(validity.valueMissing ? "This field is required." : validity.typeMismatch ? "Enter a valid email address." : validity.patternMismatch ? "Check the requested format." : "Check this value.");
+        onInvalid?.(event);
+      }}
+      onInput={event => { if (invalid) setInvalid(""); onInput?.(event); }}/>
+    {invalid && <span className="field-error" id={messageId}>{invalid}</span>}
+  </>;
 }
 export function LoadingIndicator({ label = "Working…", compact = false }: { label?: string; compact?: boolean }) {
  return <span className={`relay-loading ${compact ? 'is-compact' : ''}`} role="status"><span className="relay-loading-track" aria-hidden="true"><i /><i /><i /></span><span>{label}</span></span>;
@@ -154,118 +177,119 @@ export function ListRow({
 }) {
   return <div className={`list-row ${className}`}>{children}</div>;
 }
-export function Dialog({
-  open,
-  onClose,
-  title,
-  children,
-}: {
-  open: boolean;
-  onClose: () => void;
-  title: string;
-  children: ReactNode;
+export function Dialog({ open, onClose, title, children, footer, className = "", closeDisabled = false }: {
+  open: boolean; onClose: () => void; title: string; children: ReactNode;
+  footer?: ReactNode; className?: string; closeDisabled?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const escapeFromMenu = useRef(false);
+  const keyboard = useRef(false);
+  const trigger = useRef<HTMLElement | null>(null);
+  const [presentation, setPresentation] = useState({ open, key: 0 });
+  // Remount before committing a fresh form, rather than changing its controlled fields in an effect.
+  if (presentation.open !== open)
+    setPresentation({ open, key: presentation.key + (open ? 1 : 0) });
+  const session = presentation.key;
+  const overflow = useRef<string | null>(null);
+  const content = useRef({ title, children, footer });
+  // Preserve the receipt/form through the exit. New content only enters on opening.
+  if (open) content.current = { title, children, footer };
+  const restoreScroll = () => {
+    if (overflow.current !== null) {
+      document.body.style.overflow = overflow.current;
+      overflow.current = null;
+    }
+  };
+  useEffect(() => {
+    const key = () => { keyboard.current = true; };
+    const pointer = () => { keyboard.current = false; };
+    window.addEventListener("keydown", key, true);
+    window.addEventListener("pointerdown", pointer, true);
+    return () => {
+      window.removeEventListener("keydown", key, true);
+      window.removeEventListener("pointerdown", pointer, true);
+      restoreScroll();
+    };
+  }, []);
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
+    const material = dialog.querySelector<HTMLElement>(".dialog-material");
+    const surface = dialog.querySelector<HTMLElement>(".dialog-surface");
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const animate = !reduced && !keyboard.current;
+    const animations: Animation[] = [];
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const originTransform = () => {
+      const from = trigger.current?.isConnected ? trigger.current.getBoundingClientRect() : null;
+      const to = dialog.getBoundingClientRect();
+      if (!from || from.width < 24 || !to.width || !to.height) return "translateY(18px) scale(.975)";
+      return `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${Math.min(1, from.width / to.width)}, ${Math.min(1, from.height / to.height)})`;
+    };
     if (open) {
-      dialog.dataset.state = "open";
-      if (!dialog.open) dialog.showModal();
-      const animations: Animation[] = [];
-      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        animations.push(
-          dialog.animate(
-            [
-              {
-                opacity: 0,
-                transform:
-                  "perspective(1200px) translateY(18px) scale(.98) rotateX(2deg)",
-              },
-              {
-                opacity: 1,
-                transform:
-                  "perspective(1200px) translateY(0) scale(1) rotateX(0)",
-              },
-            ],
-            { duration: 340, easing: "cubic-bezier(.16,1,.3,1)" },
-          ),
-        );
-        dialog
-          .querySelectorAll(
-            ".dialog-header, form > label, form > .form-grid, form > .button, .dialog-footnote, .notification-item",
-          )
-          .forEach((el, i) => {
-            animations.push(
-              el.animate(
-                [
-                  { opacity: 0, transform: "translateY(10px)" },
-                  { opacity: 1, transform: "none" },
-                ],
-                {
-                  duration: 240,
-                  delay: 30 + Math.min(i * 20, 80),
-                  easing: "cubic-bezier(.16,1,.3,1)",
-                  fill: "backwards",
-                },
-              ),
-            );
-          });
+      if (!dialog.open) {
+        trigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        dialog.showModal();
       }
-      const overflow = document.body.style.overflow;
+      dialog.dataset.state = "open";
+      dialog.dataset.keyboard = String(keyboard.current);
+      dialog.querySelector(".dialog-body")?.scrollTo(0, 0);
+      if (overflow.current === null) overflow.current = document.body.style.overflow;
       document.body.style.overflow = "hidden";
-      return () => {
-        animations.forEach((a) => a.cancel());
-        document.body.style.overflow = overflow;
-      };
-    }
-    if (dialog.open) {
+      if (animate && material && surface) {
+        animations.push(material.animate([
+          { transform: originTransform(), opacity: .7 },
+          { transform: "none", opacity: 1 },
+        ], { duration: 460, easing: "cubic-bezier(.16,1,.3,1)" }));
+        animations.push(surface.animate([
+          { opacity: 0, transform: "translateY(10px)" },
+          { opacity: 1, transform: "none" },
+        ], { duration: 240, delay: 200, easing: "cubic-bezier(.16,1,.3,1)", fill: "backwards" }));
+      }
+    } else if (dialog.open) {
       dialog.dataset.state = "closing";
-      const reduced = window.matchMedia(
-        "(prefers-reduced-motion: reduce)",
-      ).matches;
-      const timer = setTimeout(() => dialog.close(), reduced ? 0 : 180);
-      return () => clearTimeout(timer);
+      if (animate && material && surface) {
+        animations.push(surface.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 110, fill: "forwards" }));
+        animations.push(material.animate([
+          { transform: "none", opacity: 1 },
+          { transform: originTransform(), opacity: 0 },
+        ], { duration: 230, easing: "cubic-bezier(.4,0,.2,1)", fill: "forwards" }));
+      }
+      timer = setTimeout(() => { dialog.close(); restoreScroll(); }, animate ? 230 : 0);
     }
+    return () => {
+      clearTimeout(timer);
+      animations.forEach(animation => animation.cancel());
+    };
   }, [open]);
-  return (
-    <dialog
-      ref={ref}
-      className="dialog"
-      aria-labelledby={titleId}
-      onKeyDownCapture={(event) => {
-        if (event.key === "Escape") escapeFromMenu.current = Boolean(ref.current?.querySelector(".select-menu:popover-open"));
-      }}
-      onCancel={(event) => {
-        event.preventDefault();
-        if (!escapeFromMenu.current) onClose();
-        escapeFromMenu.current = false;
-      }}
-      onClose={onClose}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) {
-          const rect = event.currentTarget.getBoundingClientRect();
-          if (
-            event.clientX < rect.left ||
-            event.clientX > rect.right ||
-            event.clientY < rect.top ||
-            event.clientY > rect.bottom
-          )
-            onClose();
-        }
-      }}
-    >
-      <div className="dialog-header">
-        <h2 id={titleId}>{title}</h2>
-        <Button variant="ghost" aria-label="Close dialog" onClick={onClose}>
-          <X size={20} />
-        </Button>
+  useEffect(() => {
+    if (!open) return;
+    const frame = requestAnimationFrame(() => {
+      ref.current?.querySelector<HTMLElement>('.dialog-body input:not([type="hidden"]):not(:disabled), .dialog-body button:not(:disabled), .dialog-body textarea:not(:disabled)')?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [session, open]);
+  return <dialog ref={ref} className={`dialog ${className}`} aria-labelledby={titleId}
+    onKeyDownCapture={event => {
+      if (event.key === "Escape") escapeFromMenu.current = Boolean(ref.current?.querySelector(".select-menu:popover-open"));
+    }}
+    onCancel={event => { event.preventDefault(); if (!escapeFromMenu.current && !closeDisabled) onClose(); escapeFromMenu.current = false; }}
+    onClose={() => { restoreScroll(); if (open) onClose(); }}
+    onClick={event => {
+      if (closeDisabled || event.target !== event.currentTarget) return;
+      const rect = event.currentTarget.getBoundingClientRect();
+      if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) onClose();
+    }}>
+    <div className="dialog-material" aria-hidden="true"/>
+    <div className="dialog-surface">
+      <div className="dialog-header"><h2 id={titleId}>{content.current.title}</h2>
+        <Button variant="ghost" aria-label="Close dialog" disabled={closeDisabled} onClick={onClose}><X size={19}/></Button>
       </div>
-      {children}
-    </dialog>
-  );
+      <div className="dialog-body" key={session}>{content.current.children}</div>
+      {content.current.footer && <div className="dialog-footer">{content.current.footer}</div>}
+    </div>
+  </dialog>;
 }
 export function Progress({ value }: { value: number }) {
   return (
