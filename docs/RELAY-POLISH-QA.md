@@ -119,3 +119,52 @@ The wider 768/1281 scans and database rollback suites above belong to the earlie
 Primary dashboard references consulted read-only: [Linear's 2026 design refresh](https://linear.app/now/behind-the-latest-design-refresh) and [Linear's custom iOS navigation](https://linear.app/now/linear-liquid-glass). The current VOVERE source remains a read-only reference. Retired Brand OS/Emil skills were not applied.
 
 Final release verification for this follow-up: `npm run build` exited 0 (TypeScript, client/server and Nitro bundles), and `git diff --check` passed. No QA entry/source remains in the worktree or production build. GitHub push sync and Lovable publishing remain distinct steps.
+
+## Supplier lifecycle and interaction pass — 8 October 2026
+
+- Native dialogs now animate their content and material together (380 ms entry / 180 ms exit); removed trigger-to-blank-rectangle FLIP and delayed form arrival. Reduced-motion and keyboard presentation remain immediate.
+- Customize is a desktop side inspector / mobile bottom surface, using the actual overview as its preview. Removed duplicate miniature preview and animated slider knobs. Corrected inherited mobile grid placement that squeezed labels.
+- Mobile shell uses a rounded floating header; navigation remains a native modal with independent scroll and fixed account controls.
+- Shared drawn success/error marks, semantic surfaces, stable-size action buttons, retained input on error, and a short actual-save receipt. No artificial network waiting.
+- Supplier Company tab → Remove supplier → impact review → Move to Trash. Suppliers → Trash → Restore. Only company owner/admin. Private rows and storage files remain retained (no permanent purge/retention job is introduced). Old uploads/shares remain revoked after restore.
+- Share, upload-link and invitation revocation now have explicit confirmation dialogs.
+- Applied `relay_supplier_trash`, `relay_trash_list_alias`, `relay_trash_foreign_key_index` to RELAY only. Snapshot uses active private views before pagination/counts; restrictive RLS and write triggers protect stale callers and definer paths.
+- SQL rollback fixtures passed: supplier lifecycle and role/tenant isolation, documents/products hidden, restore preserves documents, prior shares/links stay revoked. Existing workflow integration and 151-row pagination/operator tests also passed. No existing supplier was deleted for QA.
+- Security advisor: no new security warning; private deny-all tables intentionally have no client RLS policy. Existing Auth leaked-password protection warning remains: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection . This app uses email OTP; no paid setting changed.
+- Performance advisor's new composite foreign-key index notice addressed. Existing operator audit/suspension index notices and unused-index notices remain; no production concurrency/load claim.
+
+
+## Supplier working pages, real insights and settings — 9 October 2026
+
+This pass supersedes the earlier popup supplier detail, validation auto-focus, miniature Customize preview and outstanding SPA Back limitation above. Frontend changes are prepared for the connected GitHub branch. Pending exchange/avatar migrations and their rollback suite stay local and are excluded from this push; publishing in Lovable remains a separate step.
+
+### Implemented
+
+- Suppliers open in the main workspace at their own URL, with Company, Documents, Requirements and Certificates sections. Reload retains the selected section. Read mode uses wrapping company information; editing, cancel and save are explicit. Upload/request forms inherit the supplier context.
+- Company, supplier and profile drafts are protected on in-app navigation and browser Back. Keep editing retains the draft; Leave without saving and explicit Discard restore the correct state. Profile drafts remain mounted across Settings sections. Unload still uses the browser's native protection.
+- Settings separates Company, Privacy, Appearance and Profile. Dirty sections are marked; account security is reachable from Profile. Existing profile-name saving works. Private profile-image controls are prepared but unavailable until the pending schema is approved.
+- Overview has scoped optional Network Health and Document Validity widgets. Network Health is complete supplier profiles / total profiles, with the exact missing-requirement count. Certificate validity uses recorded certificate dates for the next 30 days, bounded results and supplier links. These are in-app insights, not an automatic email reminder service.
+- Customize has a desktop inspector and mobile bottom surface, independently scrolling content and aligned switches. Selected rows have no extra grey background. Six widgets were enabled through the owner's actual Customize controls.
+- Shared success/error marks draw into the action, with semantic mint/coral colours, stable button footprints and a bounded success hold after an actual completed write. Failure retains input and exposes Retry at the action. Dialog contents/material enter together; reduced-motion remains supported. The rounded mobile shell retains native focus and scrolling behavior.
+- Custom selections now dispatch a real bubbling change event, updating parent dirty/error state. Invalid fields retain scroll position rather than calling focus/scrollIntoView. Supplier actions use at least 44px height; supplier tabs use two balanced rows on narrow phones and Settings uses a 2x2 arrangement at 320px.
+- Guest-upload success/failure uses the same action feedback. Existing RELAY sign-in and understated registration paths are provided on intake. Login from an intake link goes through workspace bootstrap before returning to the request; pending invitations keep priority. Old unused CloudWorkspace code was removed.
+
+### Verified
+
+- `npm run build` exited 0 after the final source changes: TypeScript, client, SSR and Nitro outputs completed. `git diff --check` passed. Existing Vite/Nitro configuration warnings are retained; no package/config rewrite was needed.
+- Nine real sections opened at measured 320 and 1280 CSS px with no horizontal document overflow or rendered main error alerts. Supplier controls were additionally inspected at 390px. This is Chromium responsive evidence, not physical Safari/iOS/Android certification.
+- Supplier URL/section survives reload; its heading updates the document title after loading. Company read/edit/cancel and dirty departure were checked. Browser Back → Keep editing retained a changed supplier name; a subsequent Leave returned to the list without saving.
+- Profile dirty draft survived Company/Profile switches. Navigation guard and Discard were checked. An actual save of the existing unchanged profile name returned the green Profile saved outcome. Read-only database verification confirmed the owner name remained intact and no QA draft profile name persisted. No supplier/company edits, files or team members were saved for UI QA.
+- Required-evidence failure at 320px retained the exact scroll position (528.014px before/after). Product validation showed Retry; selecting Hoptrans through the custom menu reset the parent error and restored Save to workspace, retaining the selected supplier. No product was created.
+- Owner Overview shows real data: 2 suppliers, 0 complete profiles, 5 missing requirements, 0 recorded upcoming certificate expiries, 0 private documents and 1 open request at the time of testing. No demo metrics were introduced into the real workspace.
+- Public FAQ, marketing-to-demo navigation and a demo supplier page were checked after the Data Router change. Marketing and the demo supplier page had no horizontal overflow at measured 320 and 1280px. An invalid intake URL returned a readable unavailable-link message and a working return to the website. The bootstrap return route without a pending token returned the authenticated owner to their workspace. No fresh registration/mail delivery was performed for this check.
+- Two earlier 07:58 Vite HMR errors and one 09:00 temporary router-blocker warning remained in the tab's historical log. Neither repeated after a fresh reload and subsequent supplier/return-path navigation. Marketing's final warning/error log query was empty. Native screenshot proofs are stored locally in `docs/qa/2026-10-09/*.jpg` and are excluded from the application push. Temporary viewport overrides were reset and the owner's original Dark preference restored.
+- Supplier Trash migration and rollback suites passed as recorded above: owner/admin permissions, tenant isolation, retained documents, revoked links/shares after restore, existing workflows and 151-row paging. No production supplier was removed by the agent for QA.
+
+### Activation and remaining scope
+
+Automatic approval review rejected production activation of the new company-exchange APIs. `20261009074518_relay_company_exchange.sql` and `20261009075113_relay_private_profile_images.sql` remain **unapplied**. `COMPANY_EXCHANGE_ENABLED` remains false; no unavailable exchange RPC is called by the released UI path. The concrete review is in `docs/RELAY-EXCHANGE-ACTIVATION.md`; explicit approval is pending. No indirect activation through GitHub/Lovable is attempted.
+
+The prepared rollback suite includes request routing, own-tenant reads, member/outsider restrictions, explicit document ownership, idempotency, filters before pagination, expired-link rejection, preserved revoked shares and archive revocation. It has **not run** against the pending migration. No real company-to-company delivery or profile-image upload is claimed.
+
+Further product work remains: a dedicated own-company document library (current documents are supplier-associated), automatic supplier-request/team-invitation delivery, scheduled expiry reminder mail and authenticated cross-company end-to-end delivery after activation. Current existing guest uploads remain available; the newly polished guest-success UI was not tested by sending a real file. Signup bootstrap with a new user is not proven by the existing-owner return test. No concurrent multi-thousand-user load test or exhaustive multilingual/device clipping audit was performed. Pagination, bounded reads, cancellation and tenant tests reduce known risks but do not establish production capacity.

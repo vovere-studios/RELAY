@@ -469,16 +469,19 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_path: string | null
           created_at: string
           full_name: string
           id: string
         }
         Insert: {
+          avatar_path?: string | null
           created_at?: string
           full_name?: string
           id: string
         }
         Update: {
+          avatar_path?: string | null
           created_at?: string
           full_name?: string
           id?: string
@@ -885,6 +888,8 @@ export type Database = {
       }
     }
     Functions: {
+      relay_exchange_api: { Args: { action: string; payload?: Json }; Returns: Json };
+      relay_supplier_lifecycle: { Args: { action: string; payload?: Json }; Returns: Json };
       relay_platform_admin: { Args: { action: string; payload?: Json }; Returns: Json }
       relay_workspace_snapshot: { Args: { payload?: Json }; Returns: Json }
       add_supplier_connection: {

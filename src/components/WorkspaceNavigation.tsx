@@ -8,10 +8,10 @@ type Destination = { id: string; label: string; icon: LucideIcon };
 /** A native modal owns mobile focus, outside dismissal and nested menu semantics. */
 export function WorkspaceNavigation({
   open, onClose, destinations, view, organizationId, companySwitcher,
-  email, role, dark, onThemeChange, refreshing, onRefresh, onSignOut,
+  email, fullName, avatarUrl, role, dark, onThemeChange, refreshing, onRefresh, onSignOut,
 }: {
   open: boolean; onClose: () => void; destinations: Destination[]; view: string;
-  organizationId?: string; companySwitcher: ReactNode; email?: string; role?: string;
+  organizationId?: string; companySwitcher: ReactNode; email?: string; fullName?: string; avatarUrl?: string; role?: string;
   dark: boolean; onThemeChange: () => void; refreshing: boolean;
   onRefresh: () => void; onSignOut: () => void;
 }) {
@@ -28,8 +28,8 @@ export function WorkspaceNavigation({
         </button>
       </div>
       <div className="navigation-account">
-        <span className="user-avatar" aria-hidden="true">{email?.[0]?.toUpperCase() || "R"}</span>
-        <div><strong>{email || "Your account"}</strong><small>{role === "owner" ? "Workspace owner" : role === "admin" ? "Administrator" : "Workspace member"}</small></div>
+        <span className="user-avatar" aria-hidden="true">{avatarUrl?<img src={avatarUrl} alt=""/>:(fullName||email)?.[0]?.toUpperCase() || "R"}</span>
+        <div><strong>{fullName || email || "Your account"}</strong><small>{role === "owner" ? "Workspace owner" : role === "admin" ? "Administrator" : "Workspace member"}</small></div>
         <button type="button" className="icon-button" aria-label="Sign out" onClick={onSignOut}><LogOut size={18}/></button>
       </div>
     </div>}>

@@ -1,8 +1,10 @@
+import { ActionButton, OutcomeMark, useActionFeedback } from "../components/ActionFeedback";
+import { IntakeWorkspaceShare } from "../components/CompanyExchange";
 import { LoadingIndicator } from '../components/ui';
 import { Select } from '../components/Select';
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowUpRight, Check, Files, ShieldCheck } from "lucide-react";
+import { ArrowUpRight, Files, ShieldCheck } from "lucide-react";
 import { PublicHeader, PublicFooter } from "./marketing/Website";
 import { Button, Input } from "../components/ui";
 import { requireSupabase } from "../lib/supabase";
@@ -19,6 +21,7 @@ const tokenFromURL = () =>
   new URLSearchParams(location.hash.slice(1)).get("token") || "";
 export function Intake() {
   const [token] = useState(tokenFromURL);
+  const feedback = useActionFeedback();
   const [info, setInfo] = useState<IntakeInfo | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -46,7 +49,7 @@ export function Intake() {
   }, [token]);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!info) return;
+    if (!info || busy || !feedback.begin("intake")) return;
     setError("");
     setBusy(true);
     try {
@@ -77,8 +80,10 @@ export function Intake() {
         } catch {}
         throw new Error(reason);
       }
-      setSent(true);
+      if(sessionStorage.getItem("relay-pending-intake")===token)sessionStorage.removeItem("relay-pending-intake");
+      feedback.succeed("intake",()=>setSent(true));
     } catch (error) {
+      feedback.fail("intake");
       setError(errorMessage(error));
     } finally {
       setBusy(false);
@@ -113,21 +118,18 @@ export function Intake() {
           <div className="intake-assurance">
             <ShieldCheck size={19} />
             <span>
-              Only the receiving company can access your submission. No account
-              required.
+              Your submission is shared privately with the requesting company.
+              No account required to upload.
             </span>
           </div>
         </section>
-        <section className="access-panel intake-panel">
+        <section className="access-panel intake-panel" data-delivered={sent}>
           {sent ? (
             <>
-              <span className="intake-success">
-                <Check size={26} />
-              </span>
+              <div className="intake-delivered-mark"><OutcomeMark tone="success"/></div>
               <h2>Your files have arrived.</h2>
               <p>
-                Your submission is saved in {info?.company}'s private workspace
-                and is awaiting review.
+                Your documents are available to {info?.company} and are awaiting review.
               </p>
               <div className="access-note">
                 <strong>Your next connection can be simpler.</strong>
@@ -151,7 +153,9 @@ export function Intake() {
                 Send certificates, declarations or company information. Link
                 expires {dateLabel(info.expires_at)}.
               </p>
-              <form onSubmit={submit}>
+              <IntakeWorkspaceShare token={token} onSent={()=>setSent(true)}/>
+              <div className="intake-upload-divider"><span>Or upload files directly</span></div>
+              <form onSubmit={submit} onChange={()=>{feedback.reset("intake");setError("");}} onInvalidCapture={event=>{event.preventDefault();feedback.fail("intake");setError("Complete the required fields and choose your documents.");}}>
                 <label>
                   Your name
                   <Input
@@ -159,7 +163,7 @@ export function Intake() {
                     name="name"
                     autoComplete="name"
                     maxLength={100}
-                    disabled={busy}
+                    disabled={busy || feedback.phase("intake")==="success"}
                   />
                 </label>
                 <label>
@@ -170,12 +174,12 @@ export function Intake() {
                     type="email"
                     autoComplete="email"
                     maxLength={254}
-                    disabled={busy}
+                    disabled={busy || feedback.phase("intake")==="success"}
                   />
                 </label>
                 <label>
                   Document type
-                  <Select name="kind" disabled={busy}>
+                  <Select name="kind" disabled={busy || feedback.phase("intake")==="success"}>
                     <option value="certificate">Certificate</option>
                     <option value="declaration">Declaration</option>
                     <option value="company">Company information</option>
@@ -199,7 +203,7 @@ export function Intake() {
                     required
                     multiple
                     accept="application/pdf,image/png,image/jpeg"
-                    disabled={busy}
+                    disabled={busy || feedback.phase("intake")==="success"}
                     onChange={(event) =>
                       setFiles([...(event.target.files || [])])
                     }
@@ -216,15 +220,11 @@ export function Intake() {
                   </ul>
                 )}
                 {error && (
-                  <p className="form-error" role="alert">
-                    {error}
-                  </p>
+                  <p className="form-feedback-error" role="alert"><OutcomeMark tone="error"/><span>{error}</span></p>
                 )}
-                <Button type="submit" disabled={busy}>
-                  {busy ? <LoadingIndicator compact label="Sending your documents…" /> : "Send documents"}
-                  <ArrowUpRight size={16} />
-                </Button>
+                <ActionButton type="submit" disabled={busy} label="Send documents" phase={feedback.phase("intake")} pendingLabel="Sending documents…" successLabel="Documents delivered"/>
               </form>
+              <div className="intake-relay-invite"><strong>Not using RELAY yet?</strong><p>Keep your company documents in one place. Share them with connected partners whenever they need them.</p><Link to="/signup" onClick={()=>sessionStorage.setItem("relay-pending-intake",token)}>Create your account <ArrowUpRight size={14}/></Link></div>
               <p className="quiet-note">
                 By sending, you choose to share these files and your contact
                 details with {info.company}.

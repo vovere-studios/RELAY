@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ButtonHTMLAttributes } from "react";
-import { ArrowRight, Check, X } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Button } from "./ui";
 
 export type ActionPhase = "idle" | "pending" | "success" | "error";
@@ -48,7 +48,7 @@ export function useActionFeedback() {
       if (!mounted.current) return;
       afterConfirmation?.();
       setPhases(previous => ({ ...previous, [id]: "idle" }));
-    }, afterConfirmation ? 850 : 2200));
+    }, afterConfirmation ? 1250 : 2200));
   }, [clear]);
   const fail = useCallback((id: string) => {
     locks.current.delete(id);
@@ -88,8 +88,7 @@ export function ActionButton({
     <span className="action-button-glyph" aria-hidden="true">
       <ArrowRight className="action-idle" size={16}/>
       {phase === "pending" && <span className="action-working"><i/><i/><i/></span>}
-      <Check className="action-check" size={17}/>
-      <X className="action-error" size={16}/>
+      {(phase === "success" || phase === "error") && <OutcomeMark key={phase} tone={phase}/>}
     </span>
   </Button>;
 }
@@ -111,4 +110,13 @@ export function ActionIcon({ kind = "add" }: { kind?: "add" | "upload" | "adjust
       <g className="action-icon-request"><path d="M10 14 20 4m-6 0h6v6"/></g>
     </>}
   </svg>;
+}
+
+/** A single stroke resolves into its outcome. No looping celebration or artificial delay. */
+export function OutcomeMark({ tone }: { tone: "success" | "error" }) {
+  return <span className="outcome-mark" data-tone={tone} aria-hidden="true">
+    <svg viewBox="0 0 40 40" fill="none"><circle className="outcome-disc" cx="20" cy="20" r="19"/>
+      {tone === "success" ? <path className="outcome-stroke" pathLength="1" d="m11.5 20 5.5 5.5L28.5 14"/> : <g className="outcome-refusal"><path className="outcome-stroke" pathLength="1" d="m14.5 14.5 11 11"/><path className="outcome-stroke outcome-second" pathLength="1" d="m25.5 14.5-11 11"/></g>}
+    </svg>
+  </span>;
 }

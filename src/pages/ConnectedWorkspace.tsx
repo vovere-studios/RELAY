@@ -1,3 +1,8 @@
+import { WorkspaceInsights } from "../components/WorkspaceInsights";
+import { AccountProfile, useAccountProfile } from "../components/AccountProfile";
+import { CompanyExchange } from "../components/CompanyExchange";
+import { SupplierTrash } from "../components/SupplierTrash";
+import { Trash2 } from "lucide-react";
 import { Select } from '../components/Select';
 import {
   useCallback,
@@ -6,7 +11,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useBlocker, useNavigate, useSearchParams, type BlockerFunction } from "react-router-dom";
 import type { User } from "@supabase/supabase-js";
 import {
   ArrowUpRight,
@@ -24,7 +29,6 @@ import {
   ShieldCheck,
   Bell,
   ChevronDown,
-  X,
   Package,
   Activity,
   Sun,
@@ -33,7 +37,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useTheme } from "../lib/theme";
-import { ActionButton, ActionIcon, useActionFeedback } from "../components/ActionFeedback";
+import { ActionButton, ActionIcon, OutcomeMark, useActionFeedback } from "../components/ActionFeedback";
 import { WorkspaceNavigation } from "../components/WorkspaceNavigation";
 import { requireSupabase } from "../lib/supabase";
 import {
@@ -136,13 +140,6 @@ const titles: Record<string, [string, string]> = {
 function actionKey(name: string, payload: Record<string, unknown> = {}) {
   return `${name}:${String(payload.id || payload.company_id || payload.user_id || "")}`;
 }
-function focusInvalidField(form: HTMLFormElement) {
-  requestAnimationFrame(() => {
-    const field = form.querySelector<HTMLElement>('.select-trigger[aria-invalid="true"], input:invalid:not([type="hidden"]), textarea:invalid');
-    field?.closest("label")?.scrollIntoView({block:"nearest"});
-    field?.focus({preventScroll:true});
-  });
-}
 function field(form: FormData, name: string) {
   return String(form.get(name) || "").trim();
 }
@@ -166,25 +163,43 @@ export function ConnectedWorkspace() {
     ? params.get("view")!
     : "overview";
   const orgParam = params.get("org");
+  const returnToIntake = params.get("return") === "intake";
   const page = Math.max(0, Math.min(100000, Math.floor(Number(params.get("page")) || 0)));
   const { preference, resolved, setPreference } = useTheme();
   const [settingsDirty, setSettingsDirty] = useState(false);
+  const [supplierDirty,setSupplierDirty] = useState(false);
+  const [profileDirty,setProfileDirty] = useState(false);
   const [detailPage, setDetailPage] = useState(0);
   const [lookupQuery, setLookupQuery] = useState("");
   const [searchTerms, setSearchTerms] = useState({query:"",lookup:""});
   const [refreshing, setRefreshing] = useState(false);
+  const [trashOpen,setTrashOpen] = useState(false);
+  const [removeSupplier,setRemoveSupplier] = useState<{id:string;legal_name:string} | undefined>();
   const [customize,setCustomize] = useState(false);
-  const [widgets,setWidgets] = useState<string[]>(["network","attention","activity","privacy"]);
+  const [widgets,setWidgets] = useState<string[]>(["network","health","attention","expiry","activity","privacy"]);
   const requestController = useRef<AbortController | null>(null);
   const currentUser = useRef<User | null>(null);
   const [data, setData] = useState<Data | null>(null);
+  const accountProfile = useAccountProfile(data?.user.id);
+  const [settingsSection,setSettingsSection] = useState("Company");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [actionStatus,setActionStatus] = useState("");
+  const [actionErrors,setActionErrors] = useState<Record<string,string>>({});
   const [query, setQuery] = useState("");
   const [menu, setMenu] = useState(false);
   const [leaveIntent, setLeaveIntent] = useState<{ run: () => void } | null>(null);
-  const [confirmation, setConfirmation] = useState<{id: string; title: string; description: string; label: string; run: () => Promise<unknown>} | null>(null);
+  const navigationAccepted = useRef(false);
+  const blocker = useBlocker(useCallback<BlockerFunction>(({currentLocation,nextLocation}) =>
+    !!currentUser.current && !navigationAccepted.current && (settingsDirty || supplierDirty || profileDirty) &&
+    (currentLocation.pathname !== nextLocation.pathname || currentLocation.search !== nextLocation.search),
+  [settingsDirty,supplierDirty,profileDirty]));
+  useEffect(()=>{if(!settingsDirty&&!supplierDirty&&!profileDirty)navigationAccepted.current=false;},[settingsDirty,supplierDirty,profileDirty]);
+  function keepEditing(){setLeaveIntent(null);if(blocker.state==="blocked")blocker.reset();}
+  function leaveWithoutSaving(){const intent=leaveIntent;navigationAccepted.current=true;setLeaveIntent(null);setSupplierDirty(false);setSettingsDirty(false);setProfileDirty(false);if(blocker.state==="blocked")blocker.proceed();else intent?.run();}
+
+  const [confirmation, setConfirmation] = useState<{id: string; title: string; description: string; label: string; cancelLabel?: string; successLabel?: string; run: () => Promise<unknown>} | null>(null);
   const [dialog, setDialog] = useState<
     | "supplier"
     | "document"
@@ -195,19 +210,28 @@ export function ConnectedWorkspace() {
     | "notifications"
     | null
   >(null);
-  const [selected, setSelected] = useState<string | null>(null);
+  const selected = params.get("supplier");
+  function setSelected(id: string | null, tab = "Company") {
+    const next = new URLSearchParams(params);
+    if(data?.org.id)next.set("org",data.org.id);
+    if(id) { next.set("supplier",id); next.set("view","suppliers"); next.set("tab",tab); next.delete("page"); } else {next.delete("supplier");next.delete("tab");}
+    setParams(next);
+    setSupplierEditing(false);
+  }
+  const [supplierEditing,setSupplierEditing] = useState(false);
   const [shareIds,setShareIds] = useState<string[]>([]);
   const [generated, setGenerated] = useState<string>("");
   const [directory, setDirectory] = useState<Row<"company_directory">[]>([]);
   const [directoryQuery, setDirectoryQuery] = useState("");
   const [directoryLoading, setDirectoryLoading] = useState(false);
-  const [detailTab, setDetailTab] = useState("Company");
+  const detailTab = ["Company","Documents","Requirements","Certificates"].includes(params.get("tab")||"") ? params.get("tab")! : "Company";
+  function setDetailTab(tab:string) {const next=new URLSearchParams(params);next.set("tab",tab);setParams(next,{replace:true});}
   const generation = useRef(0);
   const loadedOrg = useRef<string | null>(null);
   const manager = !!data && data.role !== "member";
   useEffect(()=>{
     if(!data)return;
-    try{const value=JSON.parse(localStorage.getItem(`relay-overview-${data.user.id}-${data.org.id}`)||"null");setWidgets(Array.isArray(value)?value.filter(item=>["network","attention","activity","privacy"].includes(item)):["network","attention","activity","privacy"]);}catch{setWidgets(["network","attention","activity","privacy"]);}
+    try{const value=JSON.parse(localStorage.getItem(`relay-overview-${data.user.id}-${data.org.id}`)||"null");setWidgets(Array.isArray(value)?value.filter(item=>["network","health","attention","expiry","activity","privacy"].includes(item)):["network","health","attention","expiry","activity","privacy"]);}catch{setWidgets(["network","health","attention","expiry","activity","privacy"]);}
   },[data?.org.id,data?.user.id]);
   function updateWidgets(next: string[]) {
     setWidgets(next);
@@ -258,6 +282,12 @@ export function ConnectedWorkspace() {
   }, [navigate, orgParam, view, page, searchTerms, selected, detailPage, detailTab, dialog]);
   useEffect(() => { void load(); return () => { generation.current++; requestController.current?.abort(); }; }, [load]);
   useEffect(() => {
+    if (loading || !data || !returnToIntake) return;
+    const token = sessionStorage.getItem("relay-pending-intake");
+    // Finish the existing workspace bootstrap before returning a new account to its request.
+    navigate(token ? `/submit#token=${encodeURIComponent(token)}` : `/cloud?org=${data.org.id}`, {replace:true});
+  },[data,loading,returnToIntake,navigate]);
+  useEffect(() => {
     const {data:{subscription}} = requireSupabase().auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT") { currentUser.current=null; navigate("/login",{replace:true}); }
       else if (session?.user) currentUser.current=session.user;
@@ -270,14 +300,15 @@ export function ConnectedWorkspace() {
   },[query,lookupQuery]);
   useEffect(() => { setDetailPage(0); },[selected,detailTab]);
   useEffect(() => {
-    if (!settingsDirty) return;
+    if (!settingsDirty && !supplierDirty && !profileDirty) return;
     const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue="";};
     window.addEventListener("beforeunload",warn);return()=>window.removeEventListener("beforeunload",warn);
-  },[settingsDirty]);
+  },[settingsDirty,supplierDirty,profileDirty]);
   useEffect(() => {
     setQuery("");
     setMenu(false);
-    setSelected(null);
+    setDialog(null);
+    setCustomize(false);
     setGenerated("");
     setConfirmation(null);
     setLeaveIntent(null);
@@ -312,7 +343,7 @@ export function ConnectedWorkspace() {
     return () => desktop.removeEventListener("change", resize);
   }, []);
   function depart(run: () => void) {
-    if (settingsDirty) setLeaveIntent({ run });
+    if (settingsDirty || supplierDirty || profileDirty) setLeaveIntent({ run });
     else run();
   }
   function switchCompany(id: string) {
@@ -323,7 +354,7 @@ export function ConnectedWorkspace() {
     event.preventDefault();
     feedback.fail(id);
     setError("Check the highlighted fields before saving.");
-    focusInvalidField(event.currentTarget);
+
   }
   async function action(
     name: string,
@@ -334,19 +365,19 @@ export function ConnectedWorkspace() {
     if (!data || busy || !feedback.begin(feedbackId)) return;
     setBusy(true);
     setError("");
+    setActionErrors(previous=>({...previous,[feedbackId]:""}));
     try {
       const result = await workspaceAction(name, {
         organization_id: data.org.id,
         ...payload,
       });
-      feedback.succeed(feedbackId);
-      notify(success);
-      await load();
+      feedback.succeed(feedbackId,()=>void load());
+      setActionStatus(success);
       return result;
     } catch (error) {
       feedback.fail(feedbackId);
       setError(errorMessage(error));
-      notify("Changes not saved.", errorMessage(error), "error");
+      setActionErrors(previous=>({...previous,[feedbackId]:errorMessage(error)}));
     } finally {
       setBusy(false);
     }
@@ -364,7 +395,7 @@ export function ConnectedWorkspace() {
     try {
       await navigator.clipboard.writeText(url);
       feedback.succeed("copy");
-      notify("Link copied.", "Share it with the intended recipient.");
+
     } catch {
       feedback.fail("copy");
       notify("Select and copy the link.", "Clipboard access is unavailable.", "info");
@@ -389,13 +420,11 @@ export function ConnectedWorkspace() {
       setGenerated(privateLink("submit", result.token));
       feedback.succeed(feedbackId);
       await load();
-      notify(
-        "Upload link created.",
-        "Valid for fourteen days. Up to five documents.",
-      );
+
     } catch (error) {
       feedback.fail(feedbackId);
       setError(errorMessage(error));
+      setActionErrors(previous=>({...previous,[feedbackId]:errorMessage(error)}));
     } finally {
       setBusy(false);
     }
@@ -488,10 +517,7 @@ export function ConnectedWorkspace() {
         });
         feedback.succeed("dialog", () => setGenerated(privateLink("join", result.token)));
         void load();
-        notify(
-          "Invitation created.",
-          "Copy the invitation link for your colleague.",
-        );
+
         return;
       }
       if (dialog === "share")
@@ -502,13 +528,6 @@ export function ConnectedWorkspace() {
         });
       feedback.succeed("dialog", () => setDialog(current => current === submittedDialog ? null : current));
       void load();
-      notify(
-        submittedDialog === "share"
-          ? "Documents shared."
-          : submittedDialog === "request"
-            ? "Request created."
-            : "Saved to your workspace.",
-      );
     } catch (error) {
       feedback.fail("dialog");
       setError(errorMessage(error));
@@ -558,9 +577,7 @@ export function ConnectedWorkspace() {
           .eq("organization_id", data.org.id)
           .eq("id", selected),
       );
-      feedback.succeed("supplier");
-      await load();
-      notify("Company information saved.");
+      feedback.succeed("supplier",()=>{setSupplierEditing(false);setSupplierDirty(false);void load();});
     } catch (error) {
       feedback.fail("supplier");
       setError(errorMessage(error));
@@ -595,15 +612,261 @@ export function ConnectedWorkspace() {
       </a>
     </div>
   );
+  const supplierWorkspace = supplier && data && (
+          <>
+            <div className="connected-detail-tabs">
+              {["Company", "Documents", "Requirements", "Certificates"].map(
+                (tab) => (
+                  <button
+                    key={tab}
+                    aria-pressed={detailTab === tab}
+                    onClick={() => depart(()=>{setSupplierDirty(false);setSupplierEditing(false);setDetailTab(tab);})}
+                  >
+                    {tab}
+                  </button>
+                ),
+              )}
+            </div>
+
+            <MotionPanel identity={`${supplier.id}-${detailTab}`} compact>
+              {refreshing && <LoadingIndicator compact label="Updating details…"/>}
+              {detailTab === "Company" && (
+                <form className={`workspace-form supplier-company-form ${supplierEditing ? "is-editing" : "is-reading"}`} onSubmit={saveSupplier} onInvalidCapture={event=>invalidForm(event,"supplier")} aria-busy={feedback.phase("supplier") === "pending"} onChange={()=>{feedback.reset("supplier");setSupplierDirty(true);setError("");}}>
+                  <div className="supplier-section-heading"><div><h2>Company information</h2><p>The details your team works with.</p></div>{manager && !supplierEditing && <Button type="button" variant="secondary" onClick={()=>setSupplierEditing(true)}>Edit information</Button>}</div>
+                  {!supplierEditing && <dl className="supplier-info-list">{[["Company name",supplier.legal_name],["Country",supplier.country],["Country code",supplier.country_code],["Category",supplier.category],["Primary contact",supplier.contact_name],["Contact email",supplier.contact_email],["Website",supplier.website]].map(([label,value])=><div key={label}><dt>{label}</dt><dd data-empty={!value}>{!value ? "Not provided" : label==="Contact email" ? <a href={`mailto:${value}`}>{value}</a> : label==="Website"&&/^https?:\/\//i.test(value) ? <a href={value} target="_blank" rel="noopener noreferrer">{value}<ArrowUpRight size={13}/></a> : value}</dd></div>)}</dl>}
+                  <div className="supplier-company-fields">
+                  <label>
+                    Company name
+                    <Input
+                      name="name"
+                      required
+                      maxLength={160}
+                      defaultValue={supplier.legal_name}
+                      disabled={!manager || !supplierEditing}
+                    />
+                  </label>
+                  <div className="form-grid">
+                    <label>
+                      Country
+                      <Input
+                        name="country"
+                        defaultValue={supplier.country}
+                        disabled={!manager || !supplierEditing}
+                      />
+                    </label>
+                    <label>
+                      Country code
+                      <Input
+                        name="code"
+                        pattern="[A-Za-z]{2}"
+                        maxLength={2}
+                        defaultValue={supplier.country_code}
+                        disabled={!manager || !supplierEditing}
+                      />
+                    </label>
+                  </div>
+                  <label>
+                    Category
+                    <Input
+                      name="category"
+                      defaultValue={supplier.category}
+                      disabled={!manager || !supplierEditing}
+                    />
+                  </label>
+                  <label>
+                    Primary contact
+                    <Input
+                      name="contact_name"
+                      defaultValue={supplier.contact_name}
+                      disabled={!manager || !supplierEditing}
+                    />
+                  </label>
+                  <label>
+                    Contact email
+                    <Input
+                      name="contact_email"
+                      type="email"
+                      defaultValue={supplier.contact_email}
+                      disabled={!manager || !supplierEditing}
+                    />
+                  </label>
+                  <label>
+                    Website
+                    <Input
+                      name="website"
+                      defaultValue={supplier.website}
+                      disabled={!manager || !supplierEditing}
+                    />
+                  </label>
+                  </div>
+                  {manager && <>
+                    {error && feedback.phase("supplier")==="error"&&<div className="form-feedback-error" role="alert"><OutcomeMark tone="error"/><span>{error}</span></div>}
+                    {supplierEditing && <div className="supplier-save-row"><ActionButton disabled={busy} type="submit" phase={feedback.phase("supplier")} label="Save company information" successLabel="Company information saved"/><Button type="button" variant="ghost" disabled={busy} onClick={event=>{event.currentTarget.form?.reset();setSupplierEditing(false);setSupplierDirty(false);setError("");}}>Cancel</Button></div>}
+                    <div className="supplier-danger-zone"><span>Manage this connection</span><Button type="button" variant="ghost" disabled={busy} onClick={()=>{setRemoveSupplier({id:supplier.id,legal_name:supplier.legal_name});setTrashOpen(true);}}><Trash2 size={16}/>Remove supplier</Button></div>
+                  </>}
+                </form>
+              )}
+              {detailTab === "Documents" && (
+                <>
+                  {supplier.source_organization_id && <CompanyExchange organizationId={data.org.id} manager={manager} supplierId={supplier.id} onUpdated={()=>void load()}/>}
+                  <div className="supplier-section-heading"><div><h2>Supplier documents</h2><p>Uploaded files and evidence for this connection.</p></div></div>
+                  <div className="connected-list">
+                    {data.documents
+                      .filter((doc) => doc.supplier_id === supplier.id)
+                      .map((doc) => (
+                        <div className="list-row" key={doc.id}>
+                          <div className="row-copy">
+                            <strong>{doc.name}</strong>
+                            <small>
+                              {doc.submitted_by_name
+                                ? `Submitted by ${doc.submitted_by_name}`
+                                : "Company document"}{" "}
+                              · {dateLabel(doc.uploaded_at)}
+                            </small>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            aria-label={`Download ${doc.name}`}
+                            onClick={() =>
+                              void download(doc.storage_path, doc.name)
+                            }
+                          >
+                            <Download size={16} />
+                          </Button>
+                        </div>
+                      ))}
+                  </div>
+                  {!data.documents.some(
+                    (doc) => doc.supplier_id === supplier.id,
+                  ) && <p className="quiet-note">No documents received yet.</p>}
+                  {manager && (
+                    <ActionButton variant="secondary" disabled={busy} label="Create upload link" pendingLabel="Creating…" successLabel="Link created"
+                      phase={feedback.phase(`upload-link:${supplier.id}`)} onClick={() => void createLink(supplier.id)}/>
+                  )}
+                  {generatedCard}
+                </>
+              )}
+              {detailTab === "Requirements" && (
+                <>
+                  {data.requirements
+                    .filter(
+                      (requirement) =>
+                        requirement.relationship_id === relationship?.id,
+                    )
+                    .map((requirement) => (
+                      <form
+                        className="requirement-review"
+                        key={`${requirement.id}-${requirement.status}`}
+                        onInvalidCapture={event=>{event.preventDefault();const key=actionKey("review_requirement",{id:requirement.id});feedback.fail(key);setActionErrors(previous=>({...previous,[key]:"Choose a document to confirm this requirement."}));}}
+                        onChange={()=>{const key=actionKey("review_requirement",{id:requirement.id});feedback.reset(key);setActionErrors(previous=>({...previous,[key]:""}));}}
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          const form = new FormData(event.currentTarget);
+                          void action(
+                            "review_requirement",
+                            {
+                              id: requirement.id,
+                              status:
+                                requirement.status === "satisfied"
+                                  ? "missing"
+                                  : "satisfied",
+                              document_id: field(form, "document") || null,
+                            },
+                            "Requirement updated.",
+                          );
+                        }}
+                      >
+                        <div>
+                          <strong>{requirement.name}</strong>
+                          <Badge>
+                            {requirement.status === "satisfied"
+                              ? "Complete"
+                              : "Missing"}
+                          </Badge>
+                        </div>
+                        {manager && (
+                          <>
+                            <Select
+                              name="document"
+                              aria-label={`Evidence for ${requirement.name}`}
+                              required={
+                                requirement.kind === "document" &&
+                                requirement.status !== "satisfied"
+                              }
+                              defaultValue={requirement.document_id || ""}
+                            >
+                              <option value="">
+                                {requirement.kind === "company"
+                                  ? "Company information reviewed"
+                                  : "Choose supporting evidence"}
+                              </option>
+                              {data.documents
+                                .filter(
+                                  (doc) => doc.supplier_id === supplier.id,
+                                )
+                                .map((doc) => (
+                                  <option key={doc.id} value={doc.id}>
+                                    {doc.name}
+                                  </option>
+                                ))}
+                            </Select>
+                            {actionErrors[actionKey("review_requirement",{id:requirement.id})]&&<div className="form-feedback-error requirement-error" role="alert"><OutcomeMark tone="error"/><span>{actionErrors[actionKey("review_requirement",{id:requirement.id})]}</span></div>}
+                            <ActionButton type="submit" variant="secondary" disabled={busy}
+                              phase={feedback.phase(actionKey("review_requirement", {id:requirement.id}))}
+                              label={requirement.status === "satisfied" ? "Mark missing" : "Mark complete"}
+                              successLabel="Requirement updated"/>
+                          </>
+                        )}
+                      </form>
+                    ))}
+                </>
+              )}
+              {detailTab === "Certificates" && (
+                <>
+                  {data.certificates
+                    .filter((cert) => cert.supplier_id === supplier.id)
+                    .map((cert) => (
+                      <div className="list-row" key={cert.id}>
+                        <div className="row-copy">
+                          <strong>{cert.standard}</strong>
+                          <small>
+                            {cert.issuer} · Valid until{" "}
+                            {dateLabel(cert.valid_until)}
+                          </small>
+                        </div>
+                        <Badge>
+                          {new Date(cert.valid_until) < new Date()
+                            ? "Expired"
+                            : "Recorded"}
+                        </Badge>
+                      </div>
+                    ))}
+                  <p className="quiet-note">
+                    Certificate uploads remain unreviewed until their details
+                    and validity have been recorded.
+                  </p>
+                  {manager && (
+                    <CertificateForm
+                      data={data}
+                      supplierId={supplier.id}
+                      saved={load}
+                    />
+                  )}
+                </>
+              )}
+            </MotionPanel>
+            {data.detailTotal>50 && <PageControls page={detailPage} total={data.detailTotal} busy={refreshing} onChange={setDetailPage}/>}
+          </>
+  );
   return (
     <div className="app connected-app" onClickCapture={event=>{
       const link=event.target instanceof Element?event.target.closest<HTMLAnchorElement>("a[href]"):null;
-      if(!settingsDirty || !link || link.getAttribute("href")?.startsWith("#") || link.target === "_blank" || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if((!settingsDirty && !supplierDirty && !profileDirty) || !link || link.getAttribute("href")?.startsWith("#") || link.target === "_blank" || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const destination = new URL(link.href, location.href);
       if (destination.href === location.href) return;
       event.preventDefault(); event.stopPropagation();
       depart(() => {
-        setSettingsDirty(false); setMenu(false);
+        setSettingsDirty(false); setSupplierDirty(false); setProfileDirty(false); setMenu(false);
         if(destination.origin === location.origin) navigate(destination.pathname+destination.search+destination.hash);
         else location.assign(destination.href);
       });
@@ -651,10 +914,10 @@ export function ConnectedWorkspace() {
         <div className="sidebar-bottom">
           <div className="connected-person">
             <span className="user-avatar">
-              {data?.user.email?.slice(0, 1).toUpperCase() || "R"}
+              {accountProfile.url?<img src={accountProfile.url} alt=""/>:(accountProfile.profile?.full_name || data?.user.email || "R")[0].toUpperCase()}
             </span>
             <div>
-              <strong>{data?.user.email || "Your account"}</strong>
+              <strong>{accountProfile.profile?.full_name || data?.user.email || "Your account"}</strong>
               <small>{data?.role || "Company access"}</small>
             </div>
           </div>
@@ -667,7 +930,7 @@ export function ConnectedWorkspace() {
         </div>
       </aside>
       <WorkspaceNavigation open={menu} onClose={()=>setMenu(false)} destinations={sections} view={view}
-        organizationId={data?.org.id} email={data?.user.email} role={data?.role} dark={resolved === "dark"}
+        organizationId={data?.org.id} email={data?.user.email} fullName={accountProfile.profile?.full_name} avatarUrl={accountProfile.url} role={data?.role} dark={resolved === "dark"}
         onThemeChange={()=>setPreference(resolved === "light" ? "dark" : "light")}
         refreshing={loading || refreshing} onRefresh={()=>void load()}
         onSignOut={()=>depart(()=>{setSettingsDirty(false);setMenu(false);void signOut();})}
@@ -716,6 +979,12 @@ export function ConnectedWorkspace() {
           </div>
         </header>
         <main id="main" tabIndex={-1}>
+          <span className="sr-only" role="status">{actionStatus}</span>
+          {selected ? <header className="supplier-page-heading">
+            <Link className="supplier-back" to={`/cloud?view=suppliers&org=${data?.org.id || orgParam || ""}`}><ChevronRight size={15}/>All suppliers</Link>
+            <div className="supplier-page-identity"><span className="supplier-page-monogram">{supplier?.legal_name[0] || "·"}</span><div><p className="eyebrow">{supplier?.source_organization_id ? "CONNECTED ON RELAY" : "SUPPLIER CONNECTION"}</p><h1>{supplier?.legal_name || "Supplier workspace"}</h1><p>{[supplier?.country,supplier?.category].filter(Boolean).join(" · ")}</p></div></div>
+            <div className="supplier-page-actions">{manager && <><Button variant="secondary" onClick={()=>openDialog("document")}><ActionIcon kind="upload"/>Upload document</Button><Button onClick={()=>openDialog("request")}><ActionIcon kind="request"/>Request documents</Button></>}</div>
+          </header> : (
           <header className="page-header connected-heading">
             <div>
               <p className="eyebrow">
@@ -762,7 +1031,8 @@ export function ConnectedWorkspace() {
                 </Button>
               )}
           </header>
-          {error && (
+          )}
+          {error && !dialog && !confirmation && !selected && (
             <p className="form-error" role="alert">
               {error}
             </p>
@@ -780,7 +1050,8 @@ export function ConnectedWorkspace() {
               />
             )
           ) : (
-            <MotionPanel identity={`${data.org.id}-${view}`} compact>
+            <MotionPanel identity={`${data.org.id}-${view}-${selected || "list"}`} compact>
+              {selected ? <div className="supplier-workspace">{supplierWorkspace || <EmptyState title="Supplier unavailable." description="This connection may have been removed. Return to your supplier list."/>}</div> : <>
               {view === "overview" && (
                 <>
                   <div className="overview-tools"><span className="quiet-note">Your workspace at a glance.</span><Button variant="ghost" onClick={()=>setCustomize(true)}><ActionIcon kind="adjust"/>Customize overview</Button></div>
@@ -803,6 +1074,7 @@ export function ConnectedWorkspace() {
                       </div>
                     ))}
                   </div>}
+                  <WorkspaceInsights organizationId={data.org.id} suppliers={data.metrics.suppliers} complete={data.metrics.complete} health={widgets.includes("health")} expiry={widgets.includes("expiry")}/>
                   <div className={`connected-overview-grid ${!widgets.includes("attention") || !widgets.includes("activity") ? "is-single" : ""}`}>
                     {widgets.includes("attention") && <section className="connected-panel">
                       <div className="connected-panel-heading">
@@ -823,8 +1095,7 @@ export function ConnectedWorkspace() {
                               className="connected-attention"
                               key={row.id}
                               onClick={() => {
-                                setSelected(row.supplier_id);
-                                setDetailTab("Requirements");
+                                setSelected(row.supplier_id,"Requirements");
                               }}
                             >
                               <span className="company-monogram">
@@ -912,6 +1183,7 @@ export function ConnectedWorkspace() {
                       onChange={(event) => {setQuery(event.target.value);setParams(previous=>{const next=new URLSearchParams(previous);next.delete("page");return next;},{replace:true});}}
                     />
                     <span>{shownSuppliers.length} in view</span>
+                    {manager && <Button variant="ghost" onClick={()=>{setRemoveSupplier(undefined);setTrashOpen(true);}}><Trash2 size={16}/>Trash</Button>}
                   </div>
                   <div className="connected-panel connected-list">
                     {shownSuppliers.map((company) => {
@@ -924,7 +1196,6 @@ export function ConnectedWorkspace() {
                           key={company.id}
                           onClick={() => {
                             setSelected(company.id);
-                            setDetailTab("Company");
                           }}
                         >
                           <span className="company-monogram">
@@ -1071,13 +1342,7 @@ export function ConnectedWorkspace() {
                               <ActionButton
                                 variant="secondary"
                                 disabled={busy}
-                                onClick={() =>
-                                  void action(
-                                    "revoke_share",
-                                    { id: share.id },
-                                    "Document access revoked.",
-                                  )
-                                }
+                                onClick={()=>{setError("");setConfirmation({id:actionKey("revoke_share",{id:share.id}),title:"Revoke document access?",description:"This company will no longer be able to open the shared document. You can share it again later.",label:"Revoke access",cancelLabel:"Keep access",successLabel:"Access revoked",run:()=>action("revoke_share",{id:share.id},"Access revoked.")});}}
                                 phase={feedback.phase(actionKey("revoke_share", {id:share.id}))} label="Revoke access" pendingLabel="Updating…" successLabel="Access revoked"/>
                             </div>
                           ))}
@@ -1087,6 +1352,7 @@ export function ConnectedWorkspace() {
               )}
               {view === "requests" && (
                 <>
+                  <CompanyExchange organizationId={data.org.id} manager={manager} revision={data.events.length} onUpdated={()=>void load()}/>
                   <p className="quiet-note">
                     Create a request, then generate a private upload link. Your
                     supplier can submit documents without an account.
@@ -1154,13 +1420,7 @@ export function ConnectedWorkspace() {
                             <ActionButton
                               variant="ghost"
                               disabled={busy}
-                              onClick={() =>
-                                void action(
-                                  "revoke_link",
-                                  { id: link.id },
-                                  "Upload link revoked.",
-                                )
-                              }
+                              onClick={()=>{setError("");setConfirmation({id:actionKey("revoke_link",{id:link.id}),title:"Revoke this upload link?",description:"Anyone with this link will no longer be able to submit files. Existing submissions are kept.",label:"Revoke link",cancelLabel:"Keep link",successLabel:"Link revoked",run:()=>action("revoke_link",{id:link.id},"Link revoked.")});}}
                                 phase={feedback.phase(actionKey("revoke_link", {id:link.id}))} label="Revoke" pendingLabel="Updating…" successLabel="Link revoked"/>
                           )}
                         </div>
@@ -1355,13 +1615,7 @@ export function ConnectedWorkspace() {
                             <ActionButton
                               variant="ghost"
                               disabled={busy}
-                              onClick={() =>
-                                void action(
-                                  "revoke_invite",
-                                  { id: invite.id },
-                                  "Invitation revoked.",
-                                )
-                              }
+                              onClick={()=>{setError("");setConfirmation({id:actionKey("revoke_invite",{id:invite.id}),title:"Revoke this invitation?",description:"This invitation will no longer allow someone to join your workspace. You can create a new invitation later.",label:"Revoke invitation",cancelLabel:"Keep invitation",successLabel:"Invitation revoked",run:()=>action("revoke_invite",{id:invite.id},"Invitation revoked.")});}}
                                 phase={feedback.phase(actionKey("revoke_invite", {id:invite.id}))} label="Revoke" pendingLabel="Updating…" successLabel="Invitation revoked"/>
                           )}
                         </div>
@@ -1382,6 +1636,8 @@ export function ConnectedWorkspace() {
                 </>
               )}
               {view === "settings" && (
+                <div className="settings-workspace" data-section={settingsSection}>
+                <div className="settings-sections" role="group" aria-label="Settings section">{["Company","Privacy","Appearance","Profile"].map(section=><button key={section} aria-pressed={settingsSection===section} data-dirty={section==="Profile"?profileDirty:["Company","Privacy"].includes(section)&&settingsDirty} aria-label={`${section}${(section==="Profile"?profileDirty:["Company","Privacy"].includes(section)&&settingsDirty)?", unsaved changes":""}`} onClick={()=>setSettingsSection(section)}>{section}</button>)}</div>
                 <form
                   key={data.org.id}
                   onChange={()=>{setSettingsDirty(true);feedback.reset("settings:");setError("");}}
@@ -1395,7 +1651,7 @@ export function ConnectedWorkspace() {
                       {([{id:"light",label:"Light",icon:Sun},{id:"dark",label:"Dark",icon:Moon},{id:"system",label:"System",icon:Monitor}] as const).map(({id,label,icon:Icon})=><button type="button" key={id} aria-pressed={preference===id} onClick={()=>setPreference(id)}><Icon size={22}/><strong>{label}</strong><small>{id==="system"?"Follow your device":`${label} appearance`}</small></button>)}
                     </div>
                   </section>
-                  <section className="connected-panel">
+                  <section className="connected-panel settings-company">
                     <h2>Your company identity.</h2>
                     <p>
                       Keep the information behind your relationships accurate.
@@ -1454,7 +1710,7 @@ export function ConnectedWorkspace() {
                       />
                     </label>
                   </section>
-                  <section className="connected-panel">
+                  <section className="connected-panel settings-privacy">
                     <h2>Visibility, by choice.</h2>
                     <label className="settings-switch">
                       <span>
@@ -1490,21 +1746,24 @@ export function ConnectedWorkspace() {
                     </label>
                   </section>
                   {manager ? (
-                    <div className="settings-save-actions"><ActionButton type="submit" phase={feedback.phase("settings:")} disabled={busy || !settingsDirty} label={settingsDirty ? "Save changes" : "All changes saved"} successLabel="Changes saved"/>
+                    <div className="settings-save-actions">{error && feedback.phase("settings:")==="error"&&<div className="form-feedback-error" role="alert"><OutcomeMark tone="error"/><span>{error}</span></div>}<ActionButton type="submit" phase={feedback.phase("settings:")} disabled={busy || !settingsDirty} label={settingsDirty ? "Save changes" : "Company settings saved"} successLabel="Changes saved"/>
                       <Button type="button" variant="ghost" disabled={busy || !settingsDirty} onClick={event=>{event.currentTarget.form?.reset();setSettingsDirty(false);feedback.reset("settings:");setError("");}}>Discard changes</Button></div>
                   ) : (
                     <p className="quiet-note">
                       An owner or administrator can update company settings.
                     </p>
                   )}
-                  <section className="connected-panel">
+
+                </form>
+                <AccountProfile userId={data.user.id} email={data.user.email||""} onDirtyChange={setProfileDirty}/>
+                  <section className="connected-panel settings-security">
                     <h2>Your account.</h2>
                     <div className="settings-account"><span className="user-avatar">{data.user.email?.[0]?.toUpperCase()}</span><div><strong>{data.user.email}</strong><small>{data.role === "owner" ? "Company workspace owner" : data.role === "admin" ? "Company administrator" : "Workspace member"}</small></div><Badge>{data.user.email_confirmed_at?"Email verified":"Email unconfirmed"}</Badge></div><p>Your company role controls access to this workspace. It does not grant RELAY platform administration.</p>
                     <Link className="text-link" to="/account-security">
                       Sign-in and account security <ArrowUpRight size={15} />
                     </Link>
                   </section>
-                </form>
+                </div>
               )}
               {view === "activity" && (
                 <div className="connected-panel">
@@ -1530,6 +1789,7 @@ export function ConnectedWorkspace() {
                 </div>
               )}
               {["suppliers","documents","requests","products","team","activity"].includes(view) && data.total>50 && <PageControls page={page} total={data.total} busy={refreshing} onChange={next=>setParams({view,org:data.org.id,page:String(next)})}/>}
+              </> }
             </MotionPanel>
           )}
         </main>
@@ -1538,40 +1798,28 @@ export function ConnectedWorkspace() {
           <span>A product of VOVERE</span>
         </footer>
       </div>
-      <Dialog open={!!leaveIntent} onClose={()=>setLeaveIntent(null)} title="Keep your changes?" className="leave-dialog">
-        <p>Your company settings have unsaved changes. You can keep editing or leave without saving.</p>
+      {data && <SupplierTrash key={data.org.id} open={trashOpen} organizationId={data.org.id} supplier={removeSupplier} onClose={()=>setTrashOpen(false)} onChanged={removed=>{if(removed){setSupplierDirty(false);setSelected(null);setGenerated("");}else void load();}}/>}
+      <Dialog open={!!leaveIntent || blocker.state==="blocked"} onClose={keepEditing} title="Keep your changes?" className="leave-dialog">
+        <p>You have unsaved changes. Keep editing or leave without saving.</p>
         <div className="confirmation-actions">
-          <Button variant="secondary" onClick={()=>setLeaveIntent(null)}>Keep editing</Button>
-          <Button onClick={()=>{const intent=leaveIntent;setLeaveIntent(null);intent?.run();}}>Leave without saving <ArrowUpRight size={15}/></Button>
+          <Button variant="secondary" onClick={keepEditing}>Keep editing</Button>
+          <Button onClick={leaveWithoutSaving}>Leave without saving <ArrowUpRight size={15}/></Button>
         </div>
       </Dialog>
       <Dialog closeDisabled={busy} open={!!confirmation} onClose={()=>{if(!busy){if(confirmation)feedback.reset(confirmation.id);setConfirmation(null);}}} title={confirmation?.title || "Confirm your action."}>
         {confirmation && <div className="workspace-form"><p>{confirmation.description}</p>
-          {error && <p className="form-feedback-error" role="alert"><X size={15}/><span>{error}</span></p>}
-          <div className="confirmation-actions"><Button variant="secondary" disabled={busy} onClick={()=>{feedback.reset(confirmation.id);setConfirmation(null);}}>Keep access</Button>
-            <ActionButton label={confirmation.label} phase={feedback.phase(confirmation.id)} pendingLabel="Updating…" successLabel="Access removed" disabled={busy} onClick={()=>{const target=confirmation;void target.run().then(saved=>{if(saved)feedback.succeed(target.id,()=>setConfirmation(null));});}}/>
+          {error && <p className="form-feedback-error" role="alert"><OutcomeMark tone="error"/><span>{error}</span></p>}
+          <div className="confirmation-actions"><Button variant="secondary" disabled={busy} onClick={()=>{feedback.reset(confirmation.id);setConfirmation(null);}}>{confirmation.cancelLabel || "Keep access"}</Button>
+            <ActionButton label={confirmation.label} phase={feedback.phase(confirmation.id)} pendingLabel="Updating…" successLabel={confirmation.successLabel || "Access removed"} disabled={busy} onClick={()=>{const target=confirmation;void target.run().then(saved=>{if(saved)feedback.succeed(target.id,()=>{setConfirmation(null);void load();});});}}/>
           </div>
         </div>}
       </Dialog>
-      <Dialog open={customize} onClose={()=>setCustomize(false)} title="Your view. Your priorities." className="customize-dialog"
-        footer={<><Button variant="ghost" onClick={()=>updateWidgets(["network","attention","activity","privacy"])}>Restore defaults</Button><Button onClick={()=>setCustomize(false)}>Done</Button></>}>
+      <Dialog open={customize} onClose={()=>setCustomize(false)} title="Your view. Your priorities." className="customize-dialog" motion="inspector"
+        footer={<><Button variant="ghost" onClick={()=>updateWidgets(["network","health","attention","expiry","activity","privacy"])}>Restore defaults</Button><Button onClick={()=>setCustomize(false)}>Done</Button></>}>
         <p className="customize-intro">Choose what matters at a glance. Your layout is remembered for this workspace on this device.</p>
         <div className="customize-layout">
-          <div className="customize-preview" aria-hidden="true">
-            <span className="customize-preview-label">Your overview</span>
-            <div className="customize-preview-window"><div className="customize-preview-bar"><span>relay</span><i/><i/><i/></div>
-              <div className="customize-preview-content"><strong>Your network.<br/>In focus.</strong>
-                <div className="customize-preview-block" data-visible={widgets.includes("network")}><div className="customize-preview-metrics"><span><b>{data?.metrics.suppliers || 0}</b>Companies</span><span><b>{data?.metrics.documents || 0}</b>Documents</span></div></div>
-                <div className="customize-preview-block" data-visible={widgets.includes("attention")}><div><div className="customize-preview-card"><Bell size={12}/><span>Needs attention</span><div className="customize-preview-line"/><div className="customize-preview-line"/></div></div></div></div>
-                <div className="customize-preview-block" data-visible={widgets.includes("activity")}><div><div className="customize-preview-card"><Activity size={12}/><span>Recent activity</span><div className="customize-preview-line"/></div></div>
-                <div className="customize-preview-block" data-visible={widgets.includes("privacy")}><div><div className="customize-preview-privacy"><ShieldCheck size={12}/><span>Private by company.</span></div></div></div>
-                {!widgets.length && <span className="customize-preview-empty">A little space.<br/>Made for you.</span>}
-              </div>
-            </div>
-            <p>Your choices, reflected live.</p>
-          </div>
           <div className="customize-widget-list">
-          {[{id:"network",label:"Network summary",description:"Supplier, profile, document and request totals.",icon:LayoutGrid},{id:"attention",label:"Needs attention",description:"Connections with missing information or deadlines.",icon:Bell},{id:"activity",label:"Recent activity",description:"The latest changes in your workspace.",icon:Activity},{id:"privacy",label:"Privacy reminder",description:"A direct route to your visibility settings.",icon:ShieldCheck}].map(({icon:Icon,...widget})=><label className="settings-switch" key={widget.id}>
+          {[{id:"network",label:"Network summary",description:"Supplier, profile, document and request totals.",icon:LayoutGrid},{id:"health",label:"Network health",description:"The share of complete profiles and missing requirements.",icon:Activity},{id:"expiry",label:"Document validity",description:"Expired certificates and dates coming up in 30 days.",icon:Files},{id:"attention",label:"Needs attention",description:"Connections with missing information or deadlines.",icon:Bell},{id:"activity",label:"Recent activity",description:"The latest changes in your workspace.",icon:Activity},{id:"privacy",label:"Privacy reminder",description:"A direct route to your visibility settings.",icon:ShieldCheck}].map(({icon:Icon,...widget})=><label className="settings-switch" key={widget.id}>
             <span className="customize-widget-icon" aria-hidden="true"><Icon size={17} strokeWidth={1.6}/></span>
             <span><strong>{widget.label}</strong><small>{widget.description}</small></span>
             <input type="checkbox" role="switch" aria-label={widget.label} checked={widgets.includes(widget.id)} onChange={event=>updateWidgets(event.target.checked?[...widgets,widget.id]:widgets.filter(id=>id!==widget.id))}/>
@@ -1579,257 +1827,6 @@ export function ConnectedWorkspace() {
           </div>
         </div>
         <div className="layout-saved" role="status">{layoutSaved ? <><Check size={13}/>Saved on this device</> : "Changes apply to this page only"}</div>
-      </Dialog>
-      <Dialog
-        open={!!supplier}
-        closeDisabled={busy}
-        onClose={() => {
-          if (!busy) {
-            setSelected(null);
-            setGenerated("");
-          }
-        }}
-        title={supplier?.legal_name || "Supplier connection"}
-      >
-        {supplier && data && (
-          <>
-            <div className="connected-detail-tabs">
-              {["Company", "Documents", "Requirements", "Certificates"].map(
-                (tab) => (
-                  <button
-                    key={tab}
-                    aria-pressed={detailTab === tab}
-                    onClick={() => setDetailTab(tab)}
-                  >
-                    {tab}
-                  </button>
-                ),
-              )}
-            </div>
-            {error && (
-              <p className="form-error" role="alert">
-                {error}
-              </p>
-            )}
-            <MotionPanel identity={`${supplier.id}-${detailTab}`} compact>
-              {refreshing && <LoadingIndicator compact label="Updating details…"/>}
-              {detailTab === "Company" && (
-                <form className="workspace-form" onSubmit={saveSupplier} onInvalidCapture={event=>invalidForm(event,"supplier")} aria-busy={feedback.phase("supplier") === "pending"} onChange={()=>{feedback.reset("supplier");setError("");}}>
-                  <label>
-                    Company name
-                    <Input
-                      name="name"
-                      required
-                      maxLength={160}
-                      defaultValue={supplier.legal_name}
-                      disabled={!manager}
-                    />
-                  </label>
-                  <div className="form-grid">
-                    <label>
-                      Country
-                      <Input
-                        name="country"
-                        defaultValue={supplier.country}
-                        disabled={!manager}
-                      />
-                    </label>
-                    <label>
-                      Country code
-                      <Input
-                        name="code"
-                        pattern="[A-Za-z]{2}"
-                        maxLength={2}
-                        defaultValue={supplier.country_code}
-                        disabled={!manager}
-                      />
-                    </label>
-                  </div>
-                  <label>
-                    Category
-                    <Input
-                      name="category"
-                      defaultValue={supplier.category}
-                      disabled={!manager}
-                    />
-                  </label>
-                  <label>
-                    Primary contact
-                    <Input
-                      name="contact_name"
-                      defaultValue={supplier.contact_name}
-                      disabled={!manager}
-                    />
-                  </label>
-                  <label>
-                    Contact email
-                    <Input
-                      name="contact_email"
-                      type="email"
-                      defaultValue={supplier.contact_email}
-                      disabled={!manager}
-                    />
-                  </label>
-                  <label>
-                    Website
-                    <Input
-                      name="website"
-                      defaultValue={supplier.website}
-                      disabled={!manager}
-                    />
-                  </label>
-                  {manager && (
-                    <ActionButton disabled={busy} type="submit" phase={feedback.phase("supplier")} label="Save company information" successLabel="Company information saved"/>
-                  )}
-                </form>
-              )}
-              {detailTab === "Documents" && (
-                <>
-                  <div className="connected-list">
-                    {data.documents
-                      .filter((doc) => doc.supplier_id === supplier.id)
-                      .map((doc) => (
-                        <div className="list-row" key={doc.id}>
-                          <div className="row-copy">
-                            <strong>{doc.name}</strong>
-                            <small>
-                              {doc.submitted_by_name
-                                ? `Submitted by ${doc.submitted_by_name}`
-                                : "Company document"}{" "}
-                              · {dateLabel(doc.uploaded_at)}
-                            </small>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            aria-label={`Download ${doc.name}`}
-                            onClick={() =>
-                              void download(doc.storage_path, doc.name)
-                            }
-                          >
-                            <Download size={16} />
-                          </Button>
-                        </div>
-                      ))}
-                  </div>
-                  {!data.documents.some(
-                    (doc) => doc.supplier_id === supplier.id,
-                  ) && <p className="quiet-note">No documents received yet.</p>}
-                  {manager && (
-                    <ActionButton variant="secondary" disabled={busy} label="Create upload link" pendingLabel="Creating…" successLabel="Link created"
-                      phase={feedback.phase(`upload-link:${supplier.id}`)} onClick={() => void createLink(supplier.id)}/>
-                  )}
-                  {generatedCard}
-                </>
-              )}
-              {detailTab === "Requirements" && (
-                <>
-                  {data.requirements
-                    .filter(
-                      (requirement) =>
-                        requirement.relationship_id === relationship?.id,
-                    )
-                    .map((requirement) => (
-                      <form
-                        className="requirement-review"
-                        key={`${requirement.id}-${requirement.status}`}
-                        onSubmit={(event) => {
-                          event.preventDefault();
-                          const form = new FormData(event.currentTarget);
-                          void action(
-                            "review_requirement",
-                            {
-                              id: requirement.id,
-                              status:
-                                requirement.status === "satisfied"
-                                  ? "missing"
-                                  : "satisfied",
-                              document_id: field(form, "document") || null,
-                            },
-                            "Requirement updated.",
-                          );
-                        }}
-                      >
-                        <div>
-                          <strong>{requirement.name}</strong>
-                          <Badge>
-                            {requirement.status === "satisfied"
-                              ? "Complete"
-                              : "Missing"}
-                          </Badge>
-                        </div>
-                        {manager && (
-                          <>
-                            <Select
-                              name="document"
-                              aria-label={`Evidence for ${requirement.name}`}
-                              required={
-                                requirement.kind === "document" &&
-                                requirement.status !== "satisfied"
-                              }
-                              defaultValue={requirement.document_id || ""}
-                            >
-                              <option value="">
-                                {requirement.kind === "company"
-                                  ? "Company information reviewed"
-                                  : "Choose supporting evidence"}
-                              </option>
-                              {data.documents
-                                .filter(
-                                  (doc) => doc.supplier_id === supplier.id,
-                                )
-                                .map((doc) => (
-                                  <option key={doc.id} value={doc.id}>
-                                    {doc.name}
-                                  </option>
-                                ))}
-                            </Select>
-                            <ActionButton type="submit" variant="secondary" disabled={busy}
-                              phase={feedback.phase(actionKey("review_requirement", {id:requirement.id}))}
-                              label={requirement.status === "satisfied" ? "Mark missing" : "Mark complete"}
-                              successLabel="Requirement updated"/>
-                          </>
-                        )}
-                      </form>
-                    ))}
-                </>
-              )}
-              {detailTab === "Certificates" && (
-                <>
-                  {data.certificates
-                    .filter((cert) => cert.supplier_id === supplier.id)
-                    .map((cert) => (
-                      <div className="list-row" key={cert.id}>
-                        <div className="row-copy">
-                          <strong>{cert.standard}</strong>
-                          <small>
-                            {cert.issuer} · Valid until{" "}
-                            {dateLabel(cert.valid_until)}
-                          </small>
-                        </div>
-                        <Badge>
-                          {new Date(cert.valid_until) < new Date()
-                            ? "Expired"
-                            : "Recorded"}
-                        </Badge>
-                      </div>
-                    ))}
-                  <p className="quiet-note">
-                    Certificate uploads remain unreviewed until their details
-                    and validity have been recorded.
-                  </p>
-                  {manager && (
-                    <CertificateForm
-                      data={data}
-                      supplierId={supplier.id}
-                      saved={load}
-                    />
-                  )}
-                </>
-              )}
-            </MotionPanel>
-            {data.detailTotal>50 && <PageControls page={detailPage} total={data.detailTotal} busy={refreshing} onChange={setDetailPage}/>}
-          </>
-        )}
       </Dialog>
       <Dialog
         open={dialog !== null}
@@ -1855,29 +1852,18 @@ export function ConnectedWorkspace() {
       >
         {data &&
           (dialog === "notifications" ? (
-            <div>
-              {data.events.slice(0, 12).map((event) => (
-                <div className="connected-event" key={event.id}>
-                  <Bell size={17} />
-                  <div>
-                    <strong>{event.title}</strong>
-                    <small>{dateLabel(event.created_at)}</small>
-                  </div>
-                </div>
-              ))}
-              {!data.events.length && (
-                <p className="quiet-note">
-                  You are all caught up. New workspace activity will appear
-                  here.
-                </p>
-              )}
+            <div className="workspace-updates"><p className="updates-intro">The latest changes across your company workspace.</p>
+              {data.events.slice(0,12).map(event=><article className="workspace-update" key={event.id}><span className="update-orbit" aria-hidden="true"><Activity size={15}/></span><div><strong>{event.title}</strong>{event.detail&&<p>{event.detail}</p>}<time dateTime={event.created_at}>{dateLabel(event.created_at)}</time></div></article>)}
+              {!data.events.length&&<div className="updates-empty"><Bell size={26}/><h3>A little quiet.</h3><p>Requests, document submissions and team updates will appear here.</p></div>}
+              <Link className="button button-secondary updates-history" to={`/cloud?view=activity&org=${data.org.id}`} onClick={()=>setDialog(null)}>View workspace activity <ArrowUpRight size={15}/></Link>
             </div>
           ) : dialog === "invite" && generated ? (
             generatedCard
           ) : (
-            <form className="workspace-form" onSubmit={submit} aria-busy={feedback.phase("dialog") === "pending"}
+            <form className="workspace-form action-form" data-outcome={feedback.phase("dialog")} onSubmit={submit} aria-busy={feedback.phase("dialog") === "pending"}
               onChange={()=>{feedback.reset("dialog");setError("");}}
               onInvalidCapture={event=>invalidForm(event,"dialog")}>
+              {feedback.phase("dialog") === "success" && <div className="form-success-receipt" role="status"><OutcomeMark tone="success"/><strong>{dialog === "invite" ? "Invitation ready." : dialog === "share" ? "Access shared." : dialog === "request" ? "Request created." : "Saved to your workspace."}</strong><span>{dialog === "invite" ? "Your invitation link is ready to copy." : "Everything is in place."}</span></div>}
               <fieldset className="action-form-fields" disabled={busy || feedback.phase("dialog") === "success"}>
               {dialog === "supplier" ? (
                 <>
@@ -1982,7 +1968,7 @@ export function ConnectedWorkspace() {
                   <label>Find a supplier<Input type="search" value={lookupQuery} onChange={event=>setLookupQuery(event.target.value)} placeholder="Search your suppliers…"/></label>
                   <label>
                     Supplier
-                    <Select required name="connection" disabled={refreshing}>
+                    <Select required name="connection" defaultValue={relationship?.id || ""} disabled={refreshing}>
                       <option value="">Choose a supplier</option>
                       {data.health.filter(row=>data.suppliers.some(company=>company.id===row.supplier_id && company.legal_name.toLowerCase().includes(searchTerms.lookup.toLowerCase()))).map((row) => (
                         <option key={row.id} value={row.id || ""}>
@@ -2009,8 +1995,7 @@ export function ConnectedWorkspace() {
                     />
                   </label>
                   <p className="quiet-note">
-                    After saving, create a private upload link and share it with
-                    your supplier.
+                    Companies connected on RELAY receive the request in their document inbox once direct exchange is active. For external suppliers, create a private upload link after saving.
                   </p>
                 </>
               ) : (
@@ -2018,7 +2003,7 @@ export function ConnectedWorkspace() {
                   <label>Find a supplier<Input type="search" value={lookupQuery} onChange={event=>setLookupQuery(event.target.value)} placeholder="Search your suppliers…"/></label>
                   <label>
                     Supplier
-                    <Select required name="supplier" disabled={refreshing}>
+                    <Select required name="supplier" defaultValue={selected || ""} disabled={refreshing}>
                       <option value="">Choose a supplier</option>
                       {data.suppliers.filter(company=>company.legal_name.toLowerCase().includes(searchTerms.lookup.toLowerCase())).map((company) => (
                         <option key={company.id} value={company.id}>
@@ -2066,7 +2051,7 @@ export function ConnectedWorkspace() {
                 </>
               )}
               </fieldset>
-              {error && <p className="form-feedback-error" role="alert"><X size={15}/><span>{error}</span></p>}
+              {error && <p className="form-feedback-error" role="alert"><OutcomeMark tone="error"/><span>{error}</span></p>}
               <ActionButton type="submit" phase={feedback.phase("dialog")}
                 disabled={busy || ((dialog === "document" || dialog === "request" || dialog === "product") && !data.suppliers.length)}
                 label={dialog === "invite" ? "Create invitation" : dialog === "share" ? "Share selected documents" : "Save to workspace"}
@@ -2122,7 +2107,7 @@ function CertificateForm({
     }
   }
   return (
-    <form className="workspace-form certificate-record-form" onSubmit={submit} onChange={()=>{feedback.reset("certificate");setError("");}} onInvalidCapture={event=>{event.preventDefault();feedback.fail("certificate");setError("Check the highlighted fields before saving.");focusInvalidField(event.currentTarget);}}>
+    <form className="workspace-form certificate-record-form" onSubmit={submit} onChange={()=>{feedback.reset("certificate");setError("");}} onInvalidCapture={event=>{event.preventDefault();feedback.fail("certificate");setError("Check the highlighted fields before saving.");}}>
       <h3>Record certificate details.</h3>
       <label>
         Supporting certificate

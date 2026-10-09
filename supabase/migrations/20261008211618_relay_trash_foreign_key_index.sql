@@ -1,0 +1,1 @@
+create index supplier_trash_org_supplier_fk on relay_private.supplier_trash(organization_id,supplier_id);

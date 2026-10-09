@@ -184,7 +184,7 @@ let modalReturnFocus: HTMLElement | null = null;
 export function Dialog({ open, onClose, title, heading, children, footer, className = "", closeDisabled = false, motion = "surface", id }: {
   open: boolean; onClose: () => void; title: string; children: ReactNode;
   heading?: ReactNode; footer?: ReactNode; className?: string; closeDisabled?: boolean;
-  motion?: "surface" | "sheet";
+  motion?: "surface" | "sheet" | "inspector";
   id?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -209,8 +209,9 @@ export function Dialog({ open, onClose, title, heading, children, footer, classN
         document.body.style.overflow = modalBodyOverflow;
         const target = modalReturnFocus;
         modalReturnFocus = null;
-        if (target?.isConnected && target.getClientRects().length && !target.closest("dialog:not([open]), [inert]"))
+        if (target?.isConnected && target !== document.body && target.getClientRects().length && !target.closest("dialog:not([open]), [inert]"))
           target.focus({ preventScroll: true });
+        else document.getElementById("main")?.focus({ preventScroll: true });
       }
     }
   };
@@ -234,13 +235,9 @@ export function Dialog({ open, onClose, title, heading, children, footer, classN
     const animate = !reduced && !keyboard.current;
     const animations: Animation[] = [];
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const originTransform = () => {
-      if (motion === "sheet") return "translateY(-14px) scale(.98)";
-      const from = trigger.current?.isConnected ? trigger.current.getBoundingClientRect() : null;
-      const to = dialog.getBoundingClientRect();
-      if (!from || from.width < 24 || !to.width || !to.height) return "translateY(18px) scale(.975)";
-      return `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${Math.min(1, from.width / to.width)}, ${Math.min(1, from.height / to.height)})`;
-    };
+    const originTransform = () => motion === "inspector"
+      ? (window.innerWidth <= 600 ? "translateY(32px)" : "translateX(32px)")
+      : motion === "sheet" ? "translateY(-12px) scale(.97)" : "translateY(18px) scale(.965)";
     if (open) {
       if (!dialog.open) {
         trigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -259,25 +256,21 @@ export function Dialog({ open, onClose, title, heading, children, footer, classN
       }
       document.body.style.overflow = "hidden";
       if (animate && material && surface) {
-        animations.push(material.animate([
-          { transform: originTransform(), opacity: .7 },
+        // Material and content travel together: no empty expanding rectangle or delayed form.
+        animations.push(dialog.animate([
+          { transform: originTransform(), opacity: 0 },
           { transform: "none", opacity: 1 },
-        ], { duration: motion === "sheet" ? 380 : 460, easing: "cubic-bezier(.16,1,.3,1)" }));
-        animations.push(surface.animate([
-          { opacity: 0, transform: "translateY(10px)" },
-          { opacity: 1, transform: "none" },
-        ], { duration: motion === "sheet" ? 300 : 240, delay: motion === "sheet" ? 60 : 200, easing: "cubic-bezier(.16,1,.3,1)", fill: "backwards" }));
+        ], { duration: motion === "inspector" ? 430 : 380, easing: "cubic-bezier(.2,.85,.2,1)", fill: "backwards" }));
       }
     } else if (dialog.open) {
       dialog.dataset.state = "closing";
       if (animate && material && surface) {
-        animations.push(surface.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 110, fill: "forwards" }));
-        animations.push(material.animate([
+        animations.push(dialog.animate([
           { transform: "none", opacity: 1 },
-          { transform: originTransform(), opacity: 0 },
-        ], { duration: 230, easing: "cubic-bezier(.4,0,.2,1)", fill: "forwards" }));
+          { transform: motion === "inspector" ? originTransform() : "translateY(8px) scale(.985)", opacity: 0 },
+        ], { duration: 180, easing: "cubic-bezier(.4,0,1,1)", fill: "forwards" }));
       }
-      timer = setTimeout(() => { dialog.close(); restoreScroll(); }, animate ? 230 : 0);
+      timer = setTimeout(() => { dialog.close(); restoreScroll(); }, animate ? 180 : 0);
     }
     return () => {
       clearTimeout(timer);

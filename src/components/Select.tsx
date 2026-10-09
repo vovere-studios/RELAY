@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type SelectHTMLAttributes, type ChangeEvent } from 'react';
+import { useEffect, useId, useRef, useState, type SelectHTMLAttributes } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 
 /** The native control owns form values/validation; the popover supplies a consistent desktop menu. */
@@ -10,6 +10,7 @@ export function Select({ children, className = '', value, defaultValue, onChange
  const [current, setCurrent] = useState(String(value ?? defaultValue ?? ''));
  const [open, setOpen] = useState(false);
  const [invalid, setInvalid] = useState(false);
+ const [showValidationMessage, setShowValidationMessage] = useState(false);
  const [label, setLabel] = useState('');
  const [active, setActive] = useState(0);
  const [options, setOptions] = useState<{value:string;label:string;disabled:boolean}[]>([]);
@@ -49,8 +50,10 @@ export function Select({ children, className = '', value, defaultValue, onChange
  const choose = (index:number) => {
   const option=options[index]; if (!option || option.disabled) return;
   const select=native.current!; select.value=option.value;
-  setCurrent(option.value); setInvalid(false); onChange?.({target:select,currentTarget:select} as ChangeEvent<HTMLSelectElement>);
-  setOpen(false); trigger.current?.focus();
+  setCurrent(option.value); setInvalid(false);
+  // Bubble the real form event so dirty state and validation also update at the form.
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+  setOpen(false); trigger.current?.focus({preventScroll:true});
  };
  const move = (direction:number) => {
   let next=active;
@@ -59,7 +62,7 @@ export function Select({ children, className = '', value, defaultValue, onChange
  };
  const selected=options.find(o=>o.value===current);
  return <span className={`select-control ${className}`}>
-  <select {...props} value={value} defaultValue={defaultValue} ref={native} className="select-native" tabIndex={-1} aria-hidden="true" onChange={event=>{setCurrent(event.target.value);onChange?.(event);}} onInvalid={event=>{event.preventDefault();setInvalid(true);trigger.current?.focus();}}>{children}</select>
+  <select {...props} value={value} defaultValue={defaultValue} ref={native} className="select-native" tabIndex={-1} aria-hidden="true" onChange={event=>{setCurrent(event.target.value);setInvalid(false);onChange?.(event);}} onInvalid={event=>{setShowValidationMessage(!event.defaultPrevented);event.preventDefault();setInvalid(true);trigger.current?.focus({preventScroll:true});}}>{children}</select>
   <button ref={trigger} type="button" className="select-trigger" disabled={props.disabled} role="combobox" aria-label={props['aria-label'] || label || undefined} aria-invalid={invalid || undefined} aria-labelledby={props['aria-labelledby']} aria-required={props.required} aria-expanded={open} aria-controls={id} aria-haspopup="listbox" aria-activedescendant={open ? `${id}-${active}` : undefined}
    onClick={()=>{keyboard.current=false;setActive(Math.max(0,options.findIndex(o=>o.value===current)));setOpen(!open);}}
    onKeyDown={event=>{
@@ -72,6 +75,6 @@ export function Select({ children, className = '', value, defaultValue, onChange
   <div ref={menu} id={id} role="listbox" className="select-menu" data-keyboard={keyboard.current} popover="manual" onToggle={event=>{if((event as unknown as {newState:string}).newState==='closed')setOpen(false);}}>
    {options.map((option,index)=><div key={`${option.value}-${index}`} id={`${id}-${index}`} role="option" aria-selected={option.value===current} aria-disabled={option.disabled} data-index={index} data-active={index===active} className="select-option" onPointerMove={()=>!option.disabled&&setActive(index)} onMouseDown={event=>event.preventDefault()} onClick={event=>{event.preventDefault();choose(index);}}><span>{option.label}</span>{option.value===current&&<Check size={15} aria-hidden="true" />}</div>)}
   </div>
-  {invalid && <span className="select-error" role="alert">Choose an option to continue.</span>}
+  {invalid && showValidationMessage && <span className="select-error" role="alert">Choose an option to continue.</span>}
  </span>;
 }

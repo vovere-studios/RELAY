@@ -7,7 +7,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Check, Info, X } from "lucide-react";
+import { Info, X } from "lucide-react";
+import { OutcomeMark } from "./ActionFeedback";
 type Tone = "success" | "error" | "info";
 type Message = { id: number; title: string; detail?: string; tone: Tone };
 const FeedbackContext = createContext<(title: string, detail?: string, tone?: Tone) => void>(
@@ -66,7 +67,7 @@ function Toast({
         }}
       >
         <span className="toast-check">
-          {message.tone === "success" ? <Check size={16} /> : message.tone === "error" ? <X size={16}/> : <Info size={16}/>}
+          {message.tone === "info" ? <Info size={16}/> : <OutcomeMark tone={message.tone}/>}
         </span>
         <div>
           <strong>{message.title}</strong>
