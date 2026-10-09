@@ -1,4 +1,5 @@
 import { formValidationMessage } from "../lib/form-validation";
+import { SegmentedControl } from "../components/SegmentedControl";
 import { WorkspaceInsights } from "../components/WorkspaceInsights";
 import { AccountProfile, useAccountProfile } from "../components/AccountProfile";
 import { CompanyExchange } from "../components/CompanyExchange";
@@ -615,19 +616,9 @@ export function ConnectedWorkspace() {
   );
   const supplierWorkspace = supplier && data && (
           <>
-            <div className="connected-detail-tabs">
-              {["Company", "Documents", "Requirements", "Certificates"].map(
-                (tab) => (
-                  <button
-                    key={tab}
-                    aria-pressed={detailTab === tab}
-                    onClick={() => depart(()=>{setSupplierDirty(false);setSupplierEditing(false);setDetailTab(tab);})}
-                  >
-                    {tab}
-                  </button>
-                ),
-              )}
-            </div>
+            <SegmentedControl className="connected-detail-tabs" label="Supplier section" value={detailTab}
+              options={["Company", "Documents", "Requirements", "Certificates"].map(tab => ({ value: tab, label: tab }))}
+              onChange={tab => depart(()=>{setSupplierDirty(false);setSupplierEditing(false);setDetailTab(tab);})}/>
 
             <MotionPanel identity={`${supplier.id}-${detailTab}`} compact>
               {refreshing && <LoadingIndicator compact label="Updating details…"/>}
@@ -1638,7 +1629,10 @@ export function ConnectedWorkspace() {
               )}
               {view === "settings" && (
                 <div className="settings-workspace" data-section={settingsSection}>
-                <div className="settings-sections" role="group" aria-label="Settings section">{["Company","Privacy","Appearance","Profile"].map(section=><button key={section} aria-pressed={settingsSection===section} data-dirty={section==="Profile"?profileDirty:["Company","Privacy"].includes(section)&&settingsDirty} aria-label={`${section}${(section==="Profile"?profileDirty:["Company","Privacy"].includes(section)&&settingsDirty)?", unsaved changes":""}`} onClick={()=>setSettingsSection(section)}>{section}</button>)}</div>
+                <SegmentedControl className="settings-sections" label="Settings section" value={settingsSection}
+                  options={["Company","Privacy","Appearance","Profile"].map(section => ({ value: section, label: section,
+                    dirty: section === "Profile" ? profileDirty : ["Company", "Privacy"].includes(section) && settingsDirty }))}
+                  onChange={setSettingsSection}/>
                 <form
                   key={data.org.id}
                   onChange={()=>{setSettingsDirty(true);feedback.reset("settings:");setError("");}}

@@ -30,7 +30,7 @@ export function MotionPanel({
   useLayoutEffect(() => {
     if (snapshot.identity === identity) return;
     const el = ref.current;
-    if (!el || matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (compact || !el || matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setSnapshot({ identity, children });
       return;
     }
@@ -57,12 +57,12 @@ export function MotionPanel({
     if (!el || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const animation = el.animate(
       [
-        { opacity: 0, transform: "translateY(18px) scale(.985)" },
+        { opacity: 0, transform: compact ? "translateY(6px)" : "translateY(18px) scale(.985)" },
         { opacity: 1, transform: "none" },
       ],
       { duration: compact ? 240 : 640, easing: settle },
     );
-    const items = [...el.children].map((child, i) =>
+    const items = (compact ? [] : [...el.children]).map((child, i) =>
       child.animate(
         [
           { opacity: 0, transform: "translateY(12px)" },

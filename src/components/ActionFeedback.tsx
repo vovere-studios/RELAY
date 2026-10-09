@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ButtonHTMLAttributes } from "react";
 import { ArrowRight } from "lucide-react";
 import { Button } from "./ui";
+import { reducedMotion, springEasing } from "../lib/motion";
 
 export type ActionPhase = "idle" | "pending" | "success" | "error";
 
@@ -80,12 +81,10 @@ export function ActionButton({
   const focusedButton = useRef<HTMLButtonElement | null>(null);
   const button = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (phase !== "error" || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!['success', 'error'].includes(phase) || reducedMotion()) return;
     const animation = button.current?.animate([
-      {transform:"none"},{transform:"translateX(-5px) scale(.99)",offset:.18},
-      {transform:"translateX(3px)",offset:.4},{transform:"translateX(-1.5px)",offset:.63},
-      {transform:"translateX(.5px)",offset:.82},{transform:"none"},
-    ],{duration:480,easing:"cubic-bezier(.22,1,.36,1)"});
+      { transform: 'scale(.985)' }, { transform: 'none' },
+    ], { duration: 420, easing: springEasing(420) });
     return () => animation?.cancel();
   },[phase,outcomeKey]);
   useEffect(() => {
@@ -127,15 +126,14 @@ export function ActionIcon({ kind = "add" }: { kind?: "add" | "upload" | "adjust
   </svg>;
 }
 
-/** The confirmation is drawn as one continuous gesture, rather than inserting a badge. */
+/** Original RELAY geometry: sequential drawing and a local refusal, not imported platform artwork. */
 export function OutcomeMark({ tone }: { tone: "success" | "error" }) {
   return <span className="outcome-mark" data-tone={tone} aria-hidden="true">
     <svg viewBox="0 0 40 40" fill="none">
       {tone === "success" ? <g className="outcome-signature">
-        <path className="outcome-signature-stroke" pathLength="1" d="M8 20.5C11.5 20.5 14 23 17 27C21 22 26.5 15 32 12"/>
+        <path className="outcome-signature-stroke" pathLength="1" d="M10 21L17 28L30 12"/>
       </g> : <>
-        <circle className="outcome-disc" cx="20" cy="20" r="18"/>
-        <g className="outcome-refusal"><path className="outcome-stroke" pathLength="1" d="M20 11.5v11"/><path className="outcome-stroke outcome-second" pathLength="1" d="M20 28h.01"/></g>
+        <g className="outcome-refusal"><path className="outcome-stroke" pathLength="1" d="M20 11v12"/><circle className="outcome-dot" cx="20" cy="29" r="1.7"/></g>
       </>}
     </svg>
   </span>;

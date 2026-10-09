@@ -16,6 +16,11 @@ export function Select({ children, className = '', value, defaultValue, onChange
  const [options, setOptions] = useState<{value:string;label:string;disabled:boolean}[]>([]);
  const keyboard = useRef(false);
  const search = useRef({text:'',time:0});
+ const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+ useEffect(() => {
+  const panel = menu.current;
+  return () => { clearTimeout(closeTimer.current); panel?.hidePopover(); };
+ }, []);
  useEffect(() => {
   const select = native.current!;
   setOptions(Array.from(select.options, o => ({value:o.value,label:o.text,disabled:o.disabled})));
@@ -26,7 +31,18 @@ export function Select({ children, className = '', value, defaultValue, onChange
   return () => select.form?.removeEventListener('reset', reset);
  }, [children, value, defaultValue]);
  useEffect(() => {
-  if (!open) return;
+  const panel = menu.current!;
+  clearTimeout(closeTimer.current);
+  if (!open) {
+   if (panel.matches(':popover-open')) {
+    panel.dataset.closing = 'true';
+    panel.inert = true;
+    closeTimer.current = setTimeout(() => panel.hidePopover(), matchMedia('(prefers-reduced-motion: reduce)').matches || keyboard.current ? 0 : 120);
+   }
+   return () => clearTimeout(closeTimer.current);
+  }
+  panel.inert = false;
+  delete panel.dataset.closing;
   const position = () => {
    const rect = trigger.current!.getBoundingClientRect();
    const panel = menu.current!;
@@ -37,6 +53,7 @@ export function Select({ children, className = '', value, defaultValue, onChange
    panel.style.maxHeight = `${Math.max(100, Math.min(320, above ? rect.top - 16 : space))}px`;
    panel.style.top = above ? 'auto' : `${rect.bottom + 6}px`;
    panel.style.bottom = above ? `${innerHeight - rect.top + 6}px` : 'auto';
+   panel.style.transformOrigin = above ? 'center bottom' : 'center top';
   };
   position();
   menu.current?.showPopover();
@@ -44,7 +61,7 @@ export function Select({ children, className = '', value, defaultValue, onChange
   document.addEventListener('pointerdown', dismiss);
   window.addEventListener('resize', position);
   window.addEventListener('scroll', position, true);
-  return () => { document.removeEventListener('pointerdown',dismiss); menu.current?.hidePopover(); window.removeEventListener('resize',position); window.removeEventListener('scroll',position,true); };
+  return () => { document.removeEventListener('pointerdown',dismiss); window.removeEventListener('resize',position); window.removeEventListener('scroll',position,true); };
  }, [open]);
  useEffect(() => { if (open) menu.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({block:'nearest'}); }, [active, open]);
  const choose = (index:number) => {

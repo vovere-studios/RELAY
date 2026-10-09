@@ -11,6 +11,7 @@ import {
 import { Link, NavLink } from "react-router-dom";
 import { ArrowUpRight, X, type LucideIcon } from "lucide-react";
 import type { SupplierStatus } from "../domain/types";
+import { springEasing } from "../lib/motion";
 export function Button({
   variant = "primary",
   className = "",
@@ -203,6 +204,7 @@ export function Dialog({ open, onClose, title, heading, children, footer, classN
     setPresentation({ open, key: presentation.key + (open ? 1 : 0) });
   const session = presentation.key;
   const scrollLocked = useRef(false);
+  const motionFrame = useRef<{ transform: string; opacity: string } | null>(null);
   const content = useRef({ title, heading, children, footer });
   // Preserve the receipt/form through the exit. New content only enters on opening.
   if (open) content.current = { title, heading, children, footer };
@@ -238,11 +240,13 @@ export function Dialog({ open, onClose, title, heading, children, footer, classN
     const surface = dialog.querySelector<HTMLElement>(".dialog-surface");
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const animate = !reduced && !keyboard.current;
+    if (!animate) motionFrame.current = null;
     const animations: Animation[] = [];
+    let active = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const originTransform = () => motion === "inspector"
       ? (window.innerWidth <= 600 ? "translateY(32px)" : "translateX(32px)")
-      : motion === "sheet" ? "translateY(-12px) scale(.97)" : "translateY(18px) scale(.965)";
+      : motion === "sheet" ? "translateY(-8px) scale(.94)" : "translateY(16px) scale(.97)";
     if (open) {
       if (!dialog.open) {
         trigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -260,25 +264,38 @@ export function Dialog({ open, onClose, title, heading, children, footer, classN
         scrollLocked.current = true;
       }
       document.body.style.overflow = "hidden";
+      if (motion === 'sheet' && trigger.current) {
+        const origin = trigger.current.getBoundingClientRect();
+        const bounds = dialog.getBoundingClientRect();
+        dialog.style.transformOrigin = `${Math.max(24, Math.min(bounds.width - 24, origin.left + origin.width / 2 - bounds.left))}px ${Math.max(16, Math.min(bounds.height - 16, origin.top + origin.height / 2 - bounds.top))}px`;
+      }
       if (animate && material && surface) {
         // Material and content travel together: no empty expanding rectangle or delayed form.
         animations.push(dialog.animate([
-          { transform: originTransform(), opacity: 0 },
+          motionFrame.current || { transform: originTransform(), opacity: .1 },
           { transform: "none", opacity: 1 },
-        ], { duration: motion === "inspector" ? 430 : 380, easing: "cubic-bezier(.2,.85,.2,1)", fill: "backwards" }));
+        ], { duration: 460, easing: springEasing(), fill: "both" }));
+        animations[0].finished.then(() => {
+          if (active) { motionFrame.current = null; animations[0].cancel(); }
+        }).catch(() => {});
       }
     } else if (dialog.open) {
       dialog.dataset.state = "closing";
       if (animate && material && surface) {
         animations.push(dialog.animate([
-          { transform: "none", opacity: 1 },
-          { transform: motion === "inspector" ? originTransform() : "translateY(8px) scale(.985)", opacity: 0 },
+          motionFrame.current || { transform: "none", opacity: 1 },
+          { transform: motion === "inspector" || motion === "sheet" ? originTransform() : "translateY(8px) scale(.985)", opacity: 0 },
         ], { duration: 180, easing: "cubic-bezier(.4,0,1,1)", fill: "forwards" }));
       }
-      timer = setTimeout(() => { dialog.close(); restoreScroll(); }, animate ? 180 : 0);
+      timer = setTimeout(() => { motionFrame.current = null; dialog.close(); restoreScroll(); }, animate ? 180 : 0);
     }
     return () => {
+      active = false;
       clearTimeout(timer);
+      if (animations.some(animation => animation.playState === 'running')) {
+        const current = getComputedStyle(dialog);
+        motionFrame.current = { transform: current.transform, opacity: current.opacity };
+      }
       animations.forEach(animation => animation.cancel());
     };
   }, [open]);
