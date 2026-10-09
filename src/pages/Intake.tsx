@@ -1,3 +1,4 @@
+import { formValidationMessage } from "../lib/form-validation";
 import { ActionButton, OutcomeMark, useActionFeedback } from "../components/ActionFeedback";
 import { IntakeWorkspaceShare } from "../components/CompanyExchange";
 import { LoadingIndicator } from '../components/ui';
@@ -155,7 +156,7 @@ export function Intake() {
               </p>
               <IntakeWorkspaceShare token={token} onSent={()=>setSent(true)}/>
               <div className="intake-upload-divider"><span>Or upload files directly</span></div>
-              <form onSubmit={submit} onChange={()=>{feedback.reset("intake");setError("");}} onInvalidCapture={event=>{event.preventDefault();feedback.fail("intake");setError("Complete the required fields and choose your documents.");}}>
+              <form onSubmit={submit} onChange={()=>{feedback.reset("intake");setError("");}} onInvalidCapture={event=>{event.preventDefault();feedback.fail("intake");setError(formValidationMessage(event.currentTarget));}}>
                 <label>
                   Your name
                   <Input
@@ -222,7 +223,7 @@ export function Intake() {
                 {error && (
                   <p className="form-feedback-error" role="alert"><OutcomeMark tone="error"/><span>{error}</span></p>
                 )}
-                <ActionButton type="submit" disabled={busy} label="Send documents" phase={feedback.phase("intake")} pendingLabel="Sending documents…" successLabel="Documents delivered"/>
+                <ActionButton type="submit" disabled={busy} label="Send documents" phase={feedback.phase("intake")} outcomeKey={feedback.version("intake")} pendingLabel="Sending documents…" successLabel="Documents delivered"/>
               </form>
               <div className="intake-relay-invite"><strong>Not using RELAY yet?</strong><p>Keep your company documents in one place. Share them with connected partners whenever they need them.</p><Link to="/signup" onClick={()=>sessionStorage.setItem("relay-pending-intake",token)}>Create your account <ArrowUpRight size={14}/></Link></div>
               <p className="quiet-note">

@@ -1,3 +1,4 @@
+import { formValidationMessage } from "../lib/form-validation";
 import { WorkspaceInsights } from "../components/WorkspaceInsights";
 import { AccountProfile, useAccountProfile } from "../components/AccountProfile";
 import { CompanyExchange } from "../components/CompanyExchange";
@@ -353,7 +354,7 @@ export function ConnectedWorkspace() {
   function invalidForm(event: FormEvent<HTMLFormElement>, id: string) {
     event.preventDefault();
     feedback.fail(id);
-    setError("Check the highlighted fields before saving.");
+    setError(formValidationMessage(event.currentTarget));
 
   }
   async function action(
@@ -605,7 +606,7 @@ export function ConnectedWorkspace() {
           value={generated}
           onFocus={(event) => event.currentTarget.select()}
         />
-        <ActionButton variant="secondary" phase={feedback.phase("copy")} label="Copy link" pendingLabel="Copying…" successLabel="Copied" onClick={() => void copy(generated)}/>
+        <ActionButton variant="secondary" phase={feedback.phase("copy")} outcomeKey={feedback.version("copy")} label="Copy link" pendingLabel="Copying…" successLabel="Copied" onClick={() => void copy(generated)}/>
       </div>
       <a href={generated} target="_blank" rel="noopener noreferrer">
         Preview the link <ArrowUpRight size={14} />
@@ -701,7 +702,7 @@ export function ConnectedWorkspace() {
                   </div>
                   {manager && <>
                     {error && feedback.phase("supplier")==="error"&&<div className="form-feedback-error" role="alert"><OutcomeMark tone="error"/><span>{error}</span></div>}
-                    {supplierEditing && <div className="supplier-save-row"><ActionButton disabled={busy} type="submit" phase={feedback.phase("supplier")} label="Save company information" successLabel="Company information saved"/><Button type="button" variant="ghost" disabled={busy} onClick={event=>{event.currentTarget.form?.reset();setSupplierEditing(false);setSupplierDirty(false);setError("");}}>Cancel</Button></div>}
+                    {supplierEditing && <div className="supplier-save-row"><ActionButton disabled={busy} type="submit" phase={feedback.phase("supplier")} outcomeKey={feedback.version("supplier")} label="Save company information" successLabel="Company information saved"/><Button type="button" variant="ghost" disabled={busy} onClick={event=>{event.currentTarget.form?.reset();setSupplierEditing(false);setSupplierDirty(false);setError("");}}>Cancel</Button></div>}
                     <div className="supplier-danger-zone"><span>Manage this connection</span><Button type="button" variant="ghost" disabled={busy} onClick={()=>{setRemoveSupplier({id:supplier.id,legal_name:supplier.legal_name});setTrashOpen(true);}}><Trash2 size={16}/>Remove supplier</Button></div>
                   </>}
                 </form>
@@ -741,7 +742,7 @@ export function ConnectedWorkspace() {
                   ) && <p className="quiet-note">No documents received yet.</p>}
                   {manager && (
                     <ActionButton variant="secondary" disabled={busy} label="Create upload link" pendingLabel="Creating…" successLabel="Link created"
-                      phase={feedback.phase(`upload-link:${supplier.id}`)} onClick={() => void createLink(supplier.id)}/>
+                      phase={feedback.phase(`upload-link:${supplier.id}`)} outcomeKey={feedback.version(`upload-link:${supplier.id}`)} onClick={() => void createLink(supplier.id)}/>
                   )}
                   {generatedCard}
                 </>
@@ -812,7 +813,7 @@ export function ConnectedWorkspace() {
                             </Select>
                             {actionErrors[actionKey("review_requirement",{id:requirement.id})]&&<div className="form-feedback-error requirement-error" role="alert"><OutcomeMark tone="error"/><span>{actionErrors[actionKey("review_requirement",{id:requirement.id})]}</span></div>}
                             <ActionButton type="submit" variant="secondary" disabled={busy}
-                              phase={feedback.phase(actionKey("review_requirement", {id:requirement.id}))}
+                              phase={feedback.phase(actionKey("review_requirement", {id:requirement.id}))} outcomeKey={feedback.version(actionKey("review_requirement", {id:requirement.id}))}
                               label={requirement.status === "satisfied" ? "Mark missing" : "Mark complete"}
                               successLabel="Requirement updated"/>
                           </>
@@ -1032,7 +1033,7 @@ export function ConnectedWorkspace() {
               )}
           </header>
           )}
-          {error && !dialog && !confirmation && !selected && (
+          {error && !dialog && !confirmation && !selected && !(view === "settings" && data && feedback.phase("settings:") === "error") && (
             <p className="form-error" role="alert">
               {error}
             </p>
@@ -1343,7 +1344,7 @@ export function ConnectedWorkspace() {
                                 variant="secondary"
                                 disabled={busy}
                                 onClick={()=>{setError("");setConfirmation({id:actionKey("revoke_share",{id:share.id}),title:"Revoke document access?",description:"This company will no longer be able to open the shared document. You can share it again later.",label:"Revoke access",cancelLabel:"Keep access",successLabel:"Access revoked",run:()=>action("revoke_share",{id:share.id},"Access revoked.")});}}
-                                phase={feedback.phase(actionKey("revoke_share", {id:share.id}))} label="Revoke access" pendingLabel="Updating…" successLabel="Access revoked"/>
+                                phase={feedback.phase(actionKey("revoke_share", {id:share.id}))} outcomeKey={feedback.version(actionKey("revoke_share", {id:share.id}))} label="Revoke access" pendingLabel="Updating…" successLabel="Access revoked"/>
                             </div>
                           ))}
                       </section>
@@ -1385,7 +1386,7 @@ export function ConnectedWorkspace() {
                           </Badge>
                           {manager && company && (
                             <ActionButton variant="secondary" disabled={busy} label="Create upload link" pendingLabel="Creating…" successLabel="Link created"
-                              phase={feedback.phase(`upload-link:${request.id}`)} onClick={()=>void createLink(company.id,request.id,request.title)}/>
+                              phase={feedback.phase(`upload-link:${request.id}`)} outcomeKey={feedback.version(`upload-link:${request.id}`)} onClick={()=>void createLink(company.id,request.id,request.title)}/>
                           )}
                         </div>
                       );
@@ -1421,7 +1422,7 @@ export function ConnectedWorkspace() {
                               variant="ghost"
                               disabled={busy}
                               onClick={()=>{setError("");setConfirmation({id:actionKey("revoke_link",{id:link.id}),title:"Revoke this upload link?",description:"Anyone with this link will no longer be able to submit files. Existing submissions are kept.",label:"Revoke link",cancelLabel:"Keep link",successLabel:"Link revoked",run:()=>action("revoke_link",{id:link.id},"Link revoked.")});}}
-                                phase={feedback.phase(actionKey("revoke_link", {id:link.id}))} label="Revoke" pendingLabel="Updating…" successLabel="Link revoked"/>
+                                phase={feedback.phase(actionKey("revoke_link", {id:link.id}))} outcomeKey={feedback.version(actionKey("revoke_link", {id:link.id}))} label="Revoke" pendingLabel="Updating…" successLabel="Link revoked"/>
                           )}
                         </div>
                       ))}
@@ -1518,7 +1519,7 @@ export function ConnectedWorkspace() {
                                 "Company connected.",
                               )
                             }
-                            phase={feedback.phase(actionKey("connect_company", {company_id:company.organization_id}))}
+                            phase={feedback.phase(actionKey("connect_company", {company_id:company.organization_id}))} outcomeKey={feedback.version(actionKey("connect_company", {company_id:company.organization_id}))}
                             label={data.suppliers.some(supplier=>supplier.source_organization_id === company.organization_id) ? "Connected" : "Connect company"}
                             pendingLabel="Connecting…" successLabel="Company connected"/>
 
@@ -1616,7 +1617,7 @@ export function ConnectedWorkspace() {
                               variant="ghost"
                               disabled={busy}
                               onClick={()=>{setError("");setConfirmation({id:actionKey("revoke_invite",{id:invite.id}),title:"Revoke this invitation?",description:"This invitation will no longer allow someone to join your workspace. You can create a new invitation later.",label:"Revoke invitation",cancelLabel:"Keep invitation",successLabel:"Invitation revoked",run:()=>action("revoke_invite",{id:invite.id},"Invitation revoked.")});}}
-                                phase={feedback.phase(actionKey("revoke_invite", {id:invite.id}))} label="Revoke" pendingLabel="Updating…" successLabel="Invitation revoked"/>
+                                phase={feedback.phase(actionKey("revoke_invite", {id:invite.id}))} outcomeKey={feedback.version(actionKey("revoke_invite", {id:invite.id}))} label="Revoke" pendingLabel="Updating…" successLabel="Invitation revoked"/>
                           )}
                         </div>
                       ))}
@@ -1746,7 +1747,7 @@ export function ConnectedWorkspace() {
                     </label>
                   </section>
                   {manager ? (
-                    <div className="settings-save-actions">{error && feedback.phase("settings:")==="error"&&<div className="form-feedback-error" role="alert"><OutcomeMark tone="error"/><span>{error}</span></div>}<ActionButton type="submit" phase={feedback.phase("settings:")} disabled={busy || !settingsDirty} label={settingsDirty ? "Save changes" : "Company settings saved"} successLabel="Changes saved"/>
+                    <div className="settings-save-actions">{error && feedback.phase("settings:")==="error"&&<div className="form-feedback-error" role="alert"><OutcomeMark tone="error"/><span>{error}</span></div>}<ActionButton type="submit" phase={feedback.phase("settings:")} outcomeKey={feedback.version("settings:")} disabled={busy || !settingsDirty} label={settingsDirty ? "Save changes" : "Company settings saved"} successLabel="Changes saved"/>
                       <Button type="button" variant="ghost" disabled={busy || !settingsDirty} onClick={event=>{event.currentTarget.form?.reset();setSettingsDirty(false);feedback.reset("settings:");setError("");}}>Discard changes</Button></div>
                   ) : (
                     <p className="quiet-note">
@@ -1810,7 +1811,7 @@ export function ConnectedWorkspace() {
         {confirmation && <div className="workspace-form"><p>{confirmation.description}</p>
           {error && <p className="form-feedback-error" role="alert"><OutcomeMark tone="error"/><span>{error}</span></p>}
           <div className="confirmation-actions"><Button variant="secondary" disabled={busy} onClick={()=>{feedback.reset(confirmation.id);setConfirmation(null);}}>{confirmation.cancelLabel || "Keep access"}</Button>
-            <ActionButton label={confirmation.label} phase={feedback.phase(confirmation.id)} pendingLabel="Updating…" successLabel={confirmation.successLabel || "Access removed"} disabled={busy} onClick={()=>{const target=confirmation;void target.run().then(saved=>{if(saved)feedback.succeed(target.id,()=>{setConfirmation(null);void load();});});}}/>
+            <ActionButton label={confirmation.label} phase={feedback.phase(confirmation.id)} outcomeKey={feedback.version(confirmation.id)} pendingLabel="Updating…" successLabel={confirmation.successLabel || "Access removed"} disabled={busy} onClick={()=>{const target=confirmation;void target.run().then(saved=>{if(saved)feedback.succeed(target.id,()=>{setConfirmation(null);void load();});});}}/>
           </div>
         </div>}
       </Dialog>
@@ -1863,7 +1864,7 @@ export function ConnectedWorkspace() {
             <form className="workspace-form action-form" data-outcome={feedback.phase("dialog")} onSubmit={submit} aria-busy={feedback.phase("dialog") === "pending"}
               onChange={()=>{feedback.reset("dialog");setError("");}}
               onInvalidCapture={event=>invalidForm(event,"dialog")}>
-              {feedback.phase("dialog") === "success" && <div className="form-success-receipt" role="status"><OutcomeMark tone="success"/><strong>{dialog === "invite" ? "Invitation ready." : dialog === "share" ? "Access shared." : dialog === "request" ? "Request created." : "Saved to your workspace."}</strong><span>{dialog === "invite" ? "Your invitation link is ready to copy." : "Everything is in place."}</span></div>}
+
               <fieldset className="action-form-fields" disabled={busy || feedback.phase("dialog") === "success"}>
               {dialog === "supplier" ? (
                 <>
@@ -2051,13 +2052,15 @@ export function ConnectedWorkspace() {
                 </>
               )}
               </fieldset>
+              <div className="action-form-footer">
               {error && <p className="form-feedback-error" role="alert"><OutcomeMark tone="error"/><span>{error}</span></p>}
-              <ActionButton type="submit" phase={feedback.phase("dialog")}
+              <ActionButton type="submit" phase={feedback.phase("dialog")} outcomeKey={feedback.version("dialog")} errorLabel={error.startsWith("Complete ") ? "Check details" : "Try again"}
                 disabled={busy || ((dialog === "document" || dialog === "request" || dialog === "product") && !data.suppliers.length)}
                 label={dialog === "invite" ? "Create invitation" : dialog === "share" ? "Share selected documents" : "Save to workspace"}
                 successLabel={dialog === "invite" ? "Invitation ready" : dialog === "share" ? "Documents shared" : dialog === "request" ? "Request created" : "Saved to workspace"}
                 pendingLabel={dialog === "document" ? "Uploading…" : "Saving…"}/>
               <span className="sr-only" role="status">{feedback.phase("dialog") === "success" ? "Saved successfully." : ""}</span>
+              </div>
             </form>
           ))}
       </Dialog>
@@ -2107,7 +2110,7 @@ function CertificateForm({
     }
   }
   return (
-    <form className="workspace-form certificate-record-form" onSubmit={submit} onChange={()=>{feedback.reset("certificate");setError("");}} onInvalidCapture={event=>{event.preventDefault();feedback.fail("certificate");setError("Check the highlighted fields before saving.");}}>
+    <form className="workspace-form certificate-record-form" onSubmit={submit} onChange={()=>{feedback.reset("certificate");setError("");}} onInvalidCapture={event=>{event.preventDefault();feedback.fail("certificate");setError(formValidationMessage(event.currentTarget));}}>
       <h3>Record certificate details.</h3>
       <label>
         Supporting certificate
@@ -2153,7 +2156,7 @@ function CertificateForm({
           {error}
         </p>
       )}
-      <ActionButton type="submit" disabled={busy} phase={feedback.phase("certificate")} label="Record certificate" successLabel="Certificate recorded"/>
+      <ActionButton type="submit" disabled={busy} phase={feedback.phase("certificate")} outcomeKey={feedback.version("certificate")} label="Record certificate" successLabel="Certificate recorded"/>
     </form>
   );
 }

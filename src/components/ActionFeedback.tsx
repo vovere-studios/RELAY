@@ -7,6 +7,7 @@ export type ActionPhase = "idle" | "pending" | "success" | "error";
 /** Each operation owns its feedback; a synchronous lock also catches double taps. */
 export function useActionFeedback() {
   const [phases, setPhases] = useState<Record<string, ActionPhase>>({});
+  const [versions, setVersions] = useState<Record<string, number>>({});
   const locks = useRef(new Set<string>());
   const pending = useRef(new Set<string>());
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
@@ -54,17 +55,21 @@ export function useActionFeedback() {
     locks.current.delete(id);
     pending.current.delete(id);
     clear(id);
-    if (mounted.current) setPhases(previous => ({ ...previous, [id]: "error" }));
+    if (mounted.current) {
+      setVersions(previous => ({...previous,[id]:(previous[id] || 0)+1}));
+      setPhases(previous => ({ ...previous, [id]: "error" }));
+    }
   }, [clear]);
-  return { phase: (id: string): ActionPhase => phases[id] || "idle", begin, succeed, fail, reset };
+  return { phase: (id: string): ActionPhase => phases[id] || "idle", version: (id:string) => versions[id] || 0, begin, succeed, fail, reset };
 }
 
 /** A fixed footprint lets label and icon change without moving nearby controls. */
 export function ActionButton({
-  phase = "idle", label, pendingLabel = "Saving…", successLabel = "Saved",
+  phase = "idle", outcomeKey = 0, label, pendingLabel = "Saving…", successLabel = "Saved",
   errorLabel = "Try again", variant = "primary", className = "", disabled, onFocus, ...props
 }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
   phase?: ActionPhase;
+  outcomeKey?: number;
   label: string;
   pendingLabel?: string;
   successLabel?: string;
@@ -73,13 +78,23 @@ export function ActionButton({
 }) {
   const labels = { idle: label, pending: pendingLabel, success: successLabel, error: errorLabel };
   const focusedButton = useRef<HTMLButtonElement | null>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (phase !== "error" || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const animation = button.current?.animate([
+      {transform:"none"},{transform:"translateX(-5px) scale(.99)",offset:.18},
+      {transform:"translateX(3px)",offset:.4},{transform:"translateX(-1.5px)",offset:.63},
+      {transform:"translateX(.5px)",offset:.82},{transform:"none"},
+    ],{duration:480,easing:"cubic-bezier(.22,1,.36,1)"});
+    return () => animation?.cancel();
+  },[phase,outcomeKey]);
   useEffect(() => {
     // Native disabled buttons lose focus while waiting. A failed action remains retryable by keyboard.
     if (phase === "error" && document.activeElement === document.body)
       focusedButton.current?.focus({ preventScroll: true });
   }, [phase]);
-  return <Button {...props} variant={variant} className={`action-button ${className}`}
-    data-phase={phase} aria-label={labels[phase]} aria-busy={phase === "pending"}
+  return <Button {...props} ref={button} variant={variant} className={`action-button ${className}`}
+    data-phase={phase} data-outcome-run={outcomeKey} aria-label={labels[phase]} aria-busy={phase === "pending"}
     onFocus={event => { focusedButton.current = event.currentTarget; onFocus?.(event); }}
     disabled={disabled || phase === "pending" || phase === "success"}>
     <span className="action-button-labels" aria-hidden="true">
@@ -88,7 +103,7 @@ export function ActionButton({
     <span className="action-button-glyph" aria-hidden="true">
       <ArrowRight className="action-idle" size={16}/>
       {phase === "pending" && <span className="action-working"><i/><i/><i/></span>}
-      {(phase === "success" || phase === "error") && <OutcomeMark key={phase} tone={phase}/>}
+      {(phase === "success" || phase === "error") && <OutcomeMark key={`${phase}:${outcomeKey}`} tone={phase}/>}
     </span>
   </Button>;
 }
@@ -112,11 +127,16 @@ export function ActionIcon({ kind = "add" }: { kind?: "add" | "upload" | "adjust
   </svg>;
 }
 
-/** A single stroke resolves into its outcome. No looping celebration or artificial delay. */
+/** The confirmation is drawn as one continuous gesture, rather than inserting a badge. */
 export function OutcomeMark({ tone }: { tone: "success" | "error" }) {
   return <span className="outcome-mark" data-tone={tone} aria-hidden="true">
-    <svg viewBox="0 0 40 40" fill="none"><circle className="outcome-disc" cx="20" cy="20" r="19"/>
-      {tone === "success" ? <path className="outcome-stroke" pathLength="1" d="m11.5 20 5.5 5.5L28.5 14"/> : <g className="outcome-refusal"><path className="outcome-stroke" pathLength="1" d="m14.5 14.5 11 11"/><path className="outcome-stroke outcome-second" pathLength="1" d="m25.5 14.5-11 11"/></g>}
+    <svg viewBox="0 0 40 40" fill="none">
+      {tone === "success" ? <g className="outcome-signature">
+        <path className="outcome-signature-stroke" pathLength="1" d="M8 20.5C11.5 20.5 14 23 17 27C21 22 26.5 15 32 12"/>
+      </g> : <>
+        <circle className="outcome-disc" cx="20" cy="20" r="18"/>
+        <g className="outcome-refusal"><path className="outcome-stroke" pathLength="1" d="M20 11.5v11"/><path className="outcome-stroke outcome-second" pathLength="1" d="M20 28h.01"/></g>
+      </>}
     </svg>
   </span>;
 }

@@ -60,11 +60,11 @@ export function SupplierTrash({ open, organizationId, supplier, onClose, onChang
         <p>The supplier and its records move to Trash. You can restore them later.</p>
         <div className="removal-counts"><span><b>{impact.documents}</b> Documents kept</span><span><b>{impact.products}</b> Products kept</span></div>
         <div className="removal-access"><strong>Sharing stops immediately.</strong><p>{impact.links} upload links and {impact.shares} document shares will be revoked. Restoring this supplier will not reactivate them.</p></div>
-        <div className="confirmation-actions"><Button variant="secondary" onClick={close} disabled={working}>Keep supplier</Button><ActionButton label="Move to Trash" pendingLabel="Removing…" successLabel="Removed" phase={feedback.phase(supplier.id)} onClick={()=>void run('trash',supplier)}/></div>
+        <div className="confirmation-actions"><Button variant="secondary" onClick={close} disabled={working}>Keep supplier</Button><ActionButton label="Move to Trash" pendingLabel="Removing…" successLabel="Removed" phase={feedback.phase(supplier.id)} outcomeKey={feedback.version(supplier.id)} onClick={()=>void run('trash',supplier)}/></div>
       </div> : !supplier && list ? <div className="trash-list">
         <p className="quiet-note">Restore a supplier and its records. Previously shared links stay revoked.</p>
         {!list.items.length && <div className="trash-empty"><ArchiveRestore size={28}/><h3>Nothing in Trash.</h3><p>Removed suppliers will appear here.</p></div>}
-        {list.items.map(item=><div className="trash-row" key={item.id}><div><strong>{item.legal_name}</strong><small>Removed {dateLabel(item.deleted_at)}</small></div><ActionButton variant="secondary" label="Restore" pendingLabel="Restoring…" successLabel="Restored" disabled={working} phase={feedback.phase(item.id)} onClick={()=>void run('restore',item)}/></div>)}
+        {list.items.map(item=><div className="trash-row" key={item.id}><div><strong>{item.legal_name}</strong><small>Removed {dateLabel(item.deleted_at)}</small></div><ActionButton variant="secondary" label="Restore" pendingLabel="Restoring…" successLabel="Restored" disabled={working} phase={feedback.phase(item.id)} outcomeKey={feedback.version(item.id)} onClick={()=>void run('restore',item)}/></div>)}
         {list.total>50 && <div className="confirmation-actions"><Button variant="secondary" disabled={!page||working} onClick={()=>setPage(p=>p-1)}>Previous</Button><span>Page {page+1}</span><Button variant="secondary" disabled={(page+1)*50>=list.total||working} onClick={()=>setPage(p=>p+1)}>Next</Button></div>}
       </div> : null}
       {error && !loading && !impact && <Button variant="secondary" onClick={()=>setRevision(v=>v+1)}>Try again</Button>}

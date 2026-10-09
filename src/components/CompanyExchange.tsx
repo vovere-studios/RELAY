@@ -31,7 +31,7 @@ export function WorkspaceDocumentPicker({organizationId,onSend,onSent,busy,label
     {!!Object.keys(selected).length&&<div className="picker-selection"><span>{Object.keys(selected).length} selected</span><p>{Object.values(selected).join(' · ')}</p></div>}
     {error&&<div className="form-feedback-error" role="alert"><OutcomeMark tone="error"/><span>{error}</span></div>}
     <div className="document-send-review"><ShieldCheck size={16}/><p>Only the selected documents are shared. The receiving company can open them until you revoke access in Documents.</p></div>
-    <ActionButton label={label} pendingLabel="Sending…" successLabel="Documents sent" phase={feedback.phase('send')} disabled={busy||!Object.keys(selected).length} onClick={()=>void send()}/>
+    <ActionButton label={label} pendingLabel="Sending…" successLabel="Documents sent" phase={feedback.phase('send')} outcomeKey={feedback.version('send')} disabled={busy||!Object.keys(selected).length} onClick={()=>void send()}/>
   </div>;
 }
 export function CompanyExchange({organizationId,manager,supplierId,revision=0,onUpdated}:{organizationId:string;manager:boolean;supplierId?:string;revision?:number;onUpdated?:()=>void}) {

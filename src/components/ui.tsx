@@ -6,6 +6,7 @@ import {
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
+  type Ref,
 } from "react";
 import { Link, NavLink } from "react-router-dom";
 import { ArrowUpRight, X, type LucideIcon } from "lucide-react";
@@ -15,6 +16,7 @@ export function Button({
   className = "",
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
+  ref?: Ref<HTMLButtonElement>;
   variant?: "primary" | "secondary" | "ghost";
 }) {
   return (
@@ -28,6 +30,7 @@ export function Input({
   ...props
 }: InputHTMLAttributes<HTMLInputElement>) {
   const [invalid, setInvalid] = useState("");
+  const [showMessage, setShowMessage] = useState(true);
   const messageId = useId();
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -39,14 +42,16 @@ export function Input({
   return <>
     <input className={`input ${className}`} {...props} ref={input}
       aria-invalid={invalid ? true : props["aria-invalid"]}
-      aria-describedby={[props["aria-describedby"], invalid ? messageId : undefined].filter(Boolean).join(" ") || undefined}
+      aria-describedby={[props["aria-describedby"], invalid && showMessage ? messageId : undefined].filter(Boolean).join(" ") || undefined}
       onInvalid={event => {
         const validity = event.currentTarget.validity;
+        // A form-level message already names the affected fields; keep the field border, avoid duplicates.
+        setShowMessage(!event.defaultPrevented);
         setInvalid(validity.valueMissing ? "This field is required." : validity.typeMismatch ? "Enter a valid email address." : validity.patternMismatch ? "Check the requested format." : "Check this value.");
         onInvalid?.(event);
       }}
       onInput={event => { if (invalid) setInvalid(""); onInput?.(event); }}/>
-    {invalid && <span className="field-error" id={messageId}>{invalid}</span>}
+    {invalid && showMessage && <span className="field-error" id={messageId}>{invalid}</span>}
   </>;
 }
 export function LoadingIndicator({ label = "Working…", compact = false }: { label?: string; compact?: boolean }) {
