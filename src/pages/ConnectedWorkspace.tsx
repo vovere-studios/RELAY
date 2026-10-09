@@ -1,3 +1,6 @@
+import { FieldLabel } from '../components/FieldLabel';
+import { RefreshControl } from '../components/RefreshControl';
+import { AppearancePicker } from '../components/AppearancePicker';
 import { formValidationMessage } from "../lib/form-validation";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { WorkspaceInsights } from "../components/WorkspaceInsights";
@@ -25,7 +28,6 @@ import {
   Globe,
   Download,
   LogOut,
-  RefreshCw,
   Search,
   Check,
   ShieldCheck,
@@ -35,7 +37,6 @@ import {
   Activity,
   Sun,
   Moon,
-  Monitor,
   ChevronRight,
 } from "lucide-react";
 import { useTheme } from "../lib/theme";
@@ -167,7 +168,7 @@ export function ConnectedWorkspace() {
   const orgParam = params.get("org");
   const returnToIntake = params.get("return") === "intake";
   const page = Math.max(0, Math.min(100000, Math.floor(Number(params.get("page")) || 0)));
-  const { preference, resolved, setPreference } = useTheme();
+  const { resolved, setPreference } = useTheme();
   const [settingsDirty, setSettingsDirty] = useState(false);
   const [supplierDirty,setSupplierDirty] = useState(false);
   const [profileDirty,setProfileDirty] = useState(false);
@@ -627,7 +628,7 @@ export function ConnectedWorkspace() {
                   <div className="supplier-section-heading"><div><h2>Company information</h2><p>The details your team works with.</p></div>{manager && !supplierEditing && <Button type="button" variant="secondary" onClick={()=>setSupplierEditing(true)}>Edit information</Button>}</div>
                   {!supplierEditing && <dl className="supplier-info-list">{[["Company name",supplier.legal_name],["Country",supplier.country],["Country code",supplier.country_code],["Category",supplier.category],["Primary contact",supplier.contact_name],["Contact email",supplier.contact_email],["Website",supplier.website]].map(([label,value])=><div key={label}><dt>{label}</dt><dd data-empty={!value}>{!value ? "Not provided" : label==="Contact email" ? <a href={`mailto:${value}`}>{value}</a> : label==="Website"&&/^https?:\/\//i.test(value) ? <a href={value} target="_blank" rel="noopener noreferrer">{value}<ArrowUpRight size={13}/></a> : value}</dd></div>)}</dl>}
                   <div className="supplier-company-fields">
-                  <label>
+                  <FieldLabel>
                     Company name
                     <Input
                       name="name"
@@ -636,17 +637,17 @@ export function ConnectedWorkspace() {
                       defaultValue={supplier.legal_name}
                       disabled={!manager || !supplierEditing}
                     />
-                  </label>
+                  </FieldLabel>
                   <div className="form-grid">
-                    <label>
+                    <FieldLabel>
                       Country
                       <Input
                         name="country"
                         defaultValue={supplier.country}
                         disabled={!manager || !supplierEditing}
                       />
-                    </label>
-                    <label>
+                    </FieldLabel>
+                    <FieldLabel>
                       Country code
                       <Input
                         name="code"
@@ -655,25 +656,25 @@ export function ConnectedWorkspace() {
                         defaultValue={supplier.country_code}
                         disabled={!manager || !supplierEditing}
                       />
-                    </label>
+                    </FieldLabel>
                   </div>
-                  <label>
+                  <FieldLabel>
                     Category
                     <Input
                       name="category"
                       defaultValue={supplier.category}
                       disabled={!manager || !supplierEditing}
                     />
-                  </label>
-                  <label>
+                  </FieldLabel>
+                  <FieldLabel>
                     Primary contact
                     <Input
                       name="contact_name"
                       defaultValue={supplier.contact_name}
                       disabled={!manager || !supplierEditing}
                     />
-                  </label>
-                  <label>
+                  </FieldLabel>
+                  <FieldLabel>
                     Contact email
                     <Input
                       name="contact_email"
@@ -681,15 +682,15 @@ export function ConnectedWorkspace() {
                       defaultValue={supplier.contact_email}
                       disabled={!manager || !supplierEditing}
                     />
-                  </label>
-                  <label>
+                  </FieldLabel>
+                  <FieldLabel>
                     Website
                     <Input
                       name="website"
                       defaultValue={supplier.website}
                       disabled={!manager || !supplierEditing}
                     />
-                  </label>
+                  </FieldLabel>
                   </div>
                   {manager && <>
                     {error && feedback.phase("supplier")==="error"&&<div className="form-feedback-error" role="alert"><OutcomeMark tone="error"/><span>{error}</span></div>}
@@ -874,7 +875,7 @@ export function ConnectedWorkspace() {
             relay<span>↗</span>
           </Link>
         </div>
-        <label className="connected-org">
+        <FieldLabel className="connected-org">
           <span className="eyebrow">YOUR COMPANY</span>
           <Select
             aria-label="Select company workspace"
@@ -888,7 +889,7 @@ export function ConnectedWorkspace() {
               </option>
             ))}
           </Select>
-        </label>
+        </FieldLabel>
         <nav aria-label="Company workspace navigation">
           {sections.map(({ id, label, icon: Icon }) => (
             <Link
@@ -926,12 +927,12 @@ export function ConnectedWorkspace() {
         onThemeChange={()=>setPreference(resolved === "light" ? "dark" : "light")}
         refreshing={loading || refreshing} onRefresh={()=>void load()}
         onSignOut={()=>depart(()=>{setSettingsDirty(false);setMenu(false);void signOut();})}
-        companySwitcher={<label className="navigation-company-switch"><span>Your company</span>
+        companySwitcher={<FieldLabel className="navigation-company-switch"><span>Your company</span>
           <Select aria-label="Select company workspace" disabled={busy || loading} value={data?.org.id || ""}
             onChange={event=>switchCompany(event.target.value)}>
             {data?.organizations.map(org=><option key={org.id} value={org.id}>{org.legal_name}</option>)}
           </Select>
-        </label>}/>
+        </FieldLabel>}/>
       <div className="main-shell">
         <header className="topbar">
           <Link className="mobile-workspace-brand" to="/" aria-label="Relay home">relay<span>↗</span></Link>
@@ -958,14 +959,7 @@ export function ConnectedWorkspace() {
             >
               <Bell size={18} />
             </button>
-            <button
-              className="icon-button workspace-refresh"
-              aria-label="Refresh workspace"
-              disabled={loading || refreshing}
-              onClick={() => void load()}
-            >
-              <RefreshCw size={17} className={refreshing ? "is-spinning" : ""} />
-            </button>
+            <RefreshControl compact busy={loading || refreshing} onRefresh={() => void load()}/>
             <span className="connection-indicator" />
             <span className="demo-label">Private workspace</span>
           </div>
@@ -1642,9 +1636,7 @@ export function ConnectedWorkspace() {
                 >
                   <section className="connected-panel settings-appearance">
                     <p className="eyebrow">YOUR EXPERIENCE</p><h2>Light. Dark. Yours.</h2><p>Choose how Relay looks on this device.</p>
-                    <div className="theme-options" role="group" aria-label="Workspace appearance">
-                      {([{id:"light",label:"Light",icon:Sun},{id:"dark",label:"Dark",icon:Moon},{id:"system",label:"System",icon:Monitor}] as const).map(({id,label,icon:Icon})=><button type="button" key={id} aria-pressed={preference===id} onClick={()=>setPreference(id)}><Icon size={22}/><strong>{label}</strong><small>{id==="system"?"Follow your device":`${label} appearance`}</small></button>)}
-                    </div>
+                    <AppearancePicker/>
                   </section>
                   <section className="connected-panel settings-company">
                     <h2>Your company identity.</h2>
@@ -1652,7 +1644,7 @@ export function ConnectedWorkspace() {
                       Keep the information behind your relationships accurate.
                     </p>
                     <div className="form-grid">
-                      <label>
+                      <FieldLabel>
                         Legal company name
                         <Input
                           name="name"
@@ -1661,8 +1653,8 @@ export function ConnectedWorkspace() {
                           defaultValue={data.org.legal_name}
                           disabled={!manager || busy}
                         />
-                      </label>
-                      <label>
+                      </FieldLabel>
+                      <FieldLabel>
                         Country code
                         <Input
                           name="country_code"
@@ -1672,8 +1664,8 @@ export function ConnectedWorkspace() {
                           disabled={!manager || busy}
                           placeholder="AT"
                         />
-                      </label>
-                      <label>
+                      </FieldLabel>
+                      <FieldLabel>
                         Registration number
                         <Input
                           name="registration_number"
@@ -1681,8 +1673,8 @@ export function ConnectedWorkspace() {
                           defaultValue={data.org.registration_number}
                           disabled={!manager || busy}
                         />
-                      </label>
-                      <label>
+                      </FieldLabel>
+                      <FieldLabel>
                         Website
                         <Input
                           name="website"
@@ -1692,9 +1684,9 @@ export function ConnectedWorkspace() {
                           defaultValue={data.org.website}
                           disabled={!manager || busy}
                         />
-                      </label>
+                      </FieldLabel>
                     </div>
-                    <label>
+                    <FieldLabel>
                       Company description
                       <textarea
                         name="description"
@@ -1703,11 +1695,11 @@ export function ConnectedWorkspace() {
                         disabled={!manager || busy}
                         rows={3}
                       />
-                    </label>
+                    </FieldLabel>
                   </section>
                   <section className="connected-panel settings-privacy">
                     <h2>Visibility, by choice.</h2>
-                    <label className="settings-switch">
+                    <FieldLabel className="settings-switch">
                       <span>
                         <strong>Appear in the company directory</strong>
                         <small>
@@ -1723,8 +1715,8 @@ export function ConnectedWorkspace() {
                         defaultChecked={data.directory?.listed || false}
                         disabled={!manager || busy}
                       />
-                    </label>
-                    <label className="settings-switch">
+                    </FieldLabel>
+                    <FieldLabel className="settings-switch">
                       <span>
                         <strong>Email updates</strong>
                         <small>
@@ -1738,7 +1730,7 @@ export function ConnectedWorkspace() {
                         defaultChecked={data.settings?.email_updates !== false}
                         disabled={!manager || busy}
                       />
-                    </label>
+                    </FieldLabel>
                   </section>
                   {manager ? (
                     <div className="settings-save-actions">{error && feedback.phase("settings:")==="error"&&<div className="form-feedback-error" role="alert"><OutcomeMark tone="error"/><span>{error}</span></div>}<ActionButton type="submit" phase={feedback.phase("settings:")} outcomeKey={feedback.version("settings:")} disabled={busy || !settingsDirty} label={settingsDirty ? "Save changes" : "Company settings saved"} successLabel="Changes saved"/>
@@ -1814,11 +1806,11 @@ export function ConnectedWorkspace() {
         <p className="customize-intro">Choose what matters at a glance. Your layout is remembered for this workspace on this device.</p>
         <div className="customize-layout">
           <div className="customize-widget-list">
-          {[{id:"network",label:"Network summary",description:"Supplier, profile, document and request totals.",icon:LayoutGrid},{id:"health",label:"Network health",description:"The share of complete profiles and missing requirements.",icon:Activity},{id:"expiry",label:"Document validity",description:"Expired certificates and dates coming up in 30 days.",icon:Files},{id:"attention",label:"Needs attention",description:"Connections with missing information or deadlines.",icon:Bell},{id:"activity",label:"Recent activity",description:"The latest changes in your workspace.",icon:Activity},{id:"privacy",label:"Privacy reminder",description:"A direct route to your visibility settings.",icon:ShieldCheck}].map(({icon:Icon,...widget})=><label className="settings-switch" key={widget.id}>
+          {[{id:"network",label:"Network summary",description:"Supplier, profile, document and request totals.",icon:LayoutGrid},{id:"health",label:"Network health",description:"The share of complete profiles and missing requirements.",icon:Activity},{id:"expiry",label:"Document validity",description:"Expired certificates and dates coming up in 30 days.",icon:Files},{id:"attention",label:"Needs attention",description:"Connections with missing information or deadlines.",icon:Bell},{id:"activity",label:"Recent activity",description:"The latest changes in your workspace.",icon:Activity},{id:"privacy",label:"Privacy reminder",description:"A direct route to your visibility settings.",icon:ShieldCheck}].map(({icon:Icon,...widget})=><FieldLabel className="settings-switch" key={widget.id}>
             <span className="customize-widget-icon" aria-hidden="true"><Icon size={17} strokeWidth={1.6}/></span>
             <span><strong>{widget.label}</strong><small>{widget.description}</small></span>
             <input type="checkbox" role="switch" aria-label={widget.label} checked={widgets.includes(widget.id)} onChange={event=>updateWidgets(event.target.checked?[...widgets,widget.id]:widgets.filter(id=>id!==widget.id))}/>
-          </label>)}
+          </FieldLabel>)}
           </div>
         </div>
         <div className="layout-saved" role="status">{layoutSaved ? <><Check size={13}/>Saved on this device</> : "Changes apply to this page only"}</div>
@@ -1862,16 +1854,16 @@ export function ConnectedWorkspace() {
               <fieldset className="action-form-fields" disabled={busy || feedback.phase("dialog") === "success"}>
               {dialog === "supplier" ? (
                 <>
-                  <label>
+                  <FieldLabel>
                     Company name
                     <Input name="name" required maxLength={160} />
-                  </label>
+                  </FieldLabel>
                   <div className="form-grid">
-                    <label>
+                    <FieldLabel>
                       Country
                       <Input name="country" required maxLength={80} />
-                    </label>
-                    <label>
+                    </FieldLabel>
+                    <FieldLabel>
                       Country code
                       <Input
                         name="code"
@@ -1880,24 +1872,24 @@ export function ConnectedWorkspace() {
                         maxLength={2}
                         placeholder="AT"
                       />
-                    </label>
+                    </FieldLabel>
                   </div>
-                  <label>
+                  <FieldLabel>
                     Category
                     <Input name="category" maxLength={100} />
-                  </label>
-                  <label>
+                  </FieldLabel>
+                  <FieldLabel>
                     Contact email
                     <Input name="email" type="email" maxLength={254} />
-                  </label>
+                  </FieldLabel>
                 </>
               ) : dialog === "invite" ? (
                 <>
-                  <label>
+                  <FieldLabel>
                     Work email
                     <Input required name="email" type="email" maxLength={254} />
-                  </label>
-                  <label>
+                  </FieldLabel>
+                  <FieldLabel>
                     Role
                     <Select name="role">
                       <option value="member">
@@ -1909,7 +1901,7 @@ export function ConnectedWorkspace() {
                         </option>
                       )}
                     </Select>
-                  </label>
+                  </FieldLabel>
                   <p className="quiet-note">
                     The recipient must accept using this confirmed email
                     address. Invitation expires in seven days.
@@ -1917,8 +1909,8 @@ export function ConnectedWorkspace() {
                 </>
               ) : dialog === "share" ? (
                 <>
-                  <label>Find a recipient<Input type="search" value={directoryQuery} onChange={event=>setDirectoryQuery(event.target.value)} placeholder="Search registered companies…"/></label>
-                  <label>
+                  <FieldLabel>Find a recipient<Input type="search" value={directoryQuery} onChange={event=>setDirectoryQuery(event.target.value)} placeholder="Search registered companies…"/></FieldLabel>
+                  <FieldLabel>
                     Recipient company
                     <Select name="recipient" required>
                       <option value="">Choose a registered company</option>
@@ -1935,13 +1927,13 @@ export function ConnectedWorkspace() {
                           </option>
                         ))}
                     </Select>
-                  </label>
-                  <label>Find documents<Input type="search" value={lookupQuery} onChange={event=>setLookupQuery(event.target.value)} placeholder="Search document names…"/></label>
+                  </FieldLabel>
+                  <FieldLabel>Find documents<Input type="search" value={lookupQuery} onChange={event=>setLookupQuery(event.target.value)} placeholder="Search document names…"/></FieldLabel>
                   <p className="quiet-note">{shareIds.length} documents selected. Search to find older files; your selection is retained.</p>
                   <fieldset className="share-document-options">
                     <legend>Choose documents to share</legend>
                     {data.documents.map((doc) => (
-                      <label key={doc.id}>
+                      <FieldLabel key={doc.id}>
                         <input
                           type="checkbox"
                           name="documents"
@@ -1950,7 +1942,7 @@ export function ConnectedWorkspace() {
                           onChange={event=>setShareIds(event.target.checked?[...shareIds,doc.id]:shareIds.filter(id=>id!==doc.id))}
                         />
                         <span>{doc.name}</span>
-                      </label>
+                      </FieldLabel>
                     ))}
                   </fieldset>
                   <p className="quiet-note">
@@ -1960,8 +1952,8 @@ export function ConnectedWorkspace() {
                 </>
               ) : dialog === "request" ? (
                 <>
-                  <label>Find a supplier<Input type="search" value={lookupQuery} onChange={event=>setLookupQuery(event.target.value)} placeholder="Search your suppliers…"/></label>
-                  <label>
+                  <FieldLabel>Find a supplier<Input type="search" value={lookupQuery} onChange={event=>setLookupQuery(event.target.value)} placeholder="Search your suppliers…"/></FieldLabel>
+                  <FieldLabel>
                     Supplier
                     <Select required name="connection" defaultValue={relationship?.id || ""} disabled={refreshing}>
                       <option value="">Choose a supplier</option>
@@ -1975,12 +1967,12 @@ export function ConnectedWorkspace() {
                         </option>
                       ))}
                     </Select>
-                  </label>
-                  <label>
+                  </FieldLabel>
+                  <FieldLabel>
                     Request title
                     <Input required name="title" maxLength={160} />
-                  </label>
-                  <label>
+                  </FieldLabel>
+                  <FieldLabel>
                     Due date
                     <Input
                       required
@@ -1988,15 +1980,15 @@ export function ConnectedWorkspace() {
                       type="date"
                       min={new Date().toISOString().slice(0, 10)}
                     />
-                  </label>
+                  </FieldLabel>
                   <p className="quiet-note">
                     Companies connected on RELAY receive the request in their document inbox once direct exchange is active. For external suppliers, create a private upload link after saving.
                   </p>
                 </>
               ) : (
                 <>
-                  <label>Find a supplier<Input type="search" value={lookupQuery} onChange={event=>setLookupQuery(event.target.value)} placeholder="Search your suppliers…"/></label>
-                  <label>
+                  <FieldLabel>Find a supplier<Input type="search" value={lookupQuery} onChange={event=>setLookupQuery(event.target.value)} placeholder="Search your suppliers…"/></FieldLabel>
+                  <FieldLabel>
                     Supplier
                     <Select required name="supplier" defaultValue={selected || ""} disabled={refreshing}>
                       <option value="">Choose a supplier</option>
@@ -2006,33 +1998,33 @@ export function ConnectedWorkspace() {
                         </option>
                       ))}
                     </Select>
-                  </label>
+                  </FieldLabel>
                   {dialog === "product" ? (
                     <>
-                      <label>
+                      <FieldLabel>
                         Product name
                         <Input required name="name" maxLength={160} />
-                      </label>
-                      <label>
+                      </FieldLabel>
+                      <FieldLabel>
                         Reference
                         <Input name="reference" maxLength={100} />
-                      </label>
-                      <label>
+                      </FieldLabel>
+                      <FieldLabel>
                         Material
                         <Input name="material" maxLength={160} />
-                      </label>
+                      </FieldLabel>
                     </>
                   ) : (
                     <>
-                      <label>
+                      <FieldLabel>
                         Document type
                         <Select name="kind">
                           <option value="certificate">Certificate</option>
                           <option value="declaration">Declaration</option>
                           <option value="company">Company information</option>
                         </Select>
-                      </label>
-                      <label className="file-drop">
+                      </FieldLabel>
+                      <FieldLabel className="file-drop">
                         PDF, PNG or JPEG · Up to 10 MB
                         <input
                           required
@@ -2040,7 +2032,7 @@ export function ConnectedWorkspace() {
                           type="file"
                           accept="application/pdf,image/png,image/jpeg"
                         />
-                      </label>
+                      </FieldLabel>
                     </>
                   )}
                 </>
@@ -2106,7 +2098,7 @@ function CertificateForm({
   return (
     <form className="workspace-form certificate-record-form" onSubmit={submit} onChange={()=>{feedback.reset("certificate");setError("");}} onInvalidCapture={event=>{event.preventDefault();feedback.fail("certificate");setError(formValidationMessage(event.currentTarget));}}>
       <h3>Record certificate details.</h3>
-      <label>
+      <FieldLabel>
         Supporting certificate
         <Select name="document" required>
           <option value="">Choose a document</option>
@@ -2121,8 +2113,8 @@ function CertificateForm({
               </option>
             ))}
         </Select>
-      </label>
-      <label>
+      </FieldLabel>
+      <FieldLabel>
         Standard
         <Input
           required
@@ -2130,20 +2122,20 @@ function CertificateForm({
           maxLength={100}
           placeholder="ISO 9001"
         />
-      </label>
-      <label>
+      </FieldLabel>
+      <FieldLabel>
         Issuer
         <Input name="issuer" maxLength={160} />
-      </label>
+      </FieldLabel>
       <div className="form-grid">
-        <label>
+        <FieldLabel>
           Valid from
           <Input required type="date" name="from" />
-        </label>
-        <label>
+        </FieldLabel>
+        <FieldLabel>
           Valid until
           <Input required type="date" name="until" />
-        </label>
+        </FieldLabel>
       </div>
       {error && (
         <p className="form-error" role="alert">

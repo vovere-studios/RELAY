@@ -1,5 +1,6 @@
+import { RefreshControl } from './RefreshControl';
 import type { ReactNode } from "react";
-import { ArrowRight, LogOut, Moon, RefreshCw, Sun, type LucideIcon } from "lucide-react";
+import { ArrowRight, LogOut, Moon, Sun, type LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Dialog } from "./ui";
 
@@ -23,9 +24,7 @@ export function WorkspaceNavigation({
         <button type="button" onClick={onThemeChange} aria-label={`Switch to ${dark ? "light" : "dark"} mode`}>
           {dark ? <Sun size={17}/> : <Moon size={17}/>}<span>{dark ? "Light appearance" : "Dark appearance"}</span>
         </button>
-        <button type="button" onClick={onRefresh} disabled={refreshing} aria-label="Refresh workspace">
-          <RefreshCw size={17} className={refreshing ? "is-spinning" : ""}/><span>{refreshing ? "Updating…" : "Refresh"}</span>
-        </button>
+        <RefreshControl busy={refreshing} onRefresh={onRefresh}/>
       </div>
       <div className="navigation-account">
         <span className="user-avatar" aria-hidden="true">{avatarUrl?<img src={avatarUrl} alt=""/>:(fullName||email)?.[0]?.toUpperCase() || "R"}</span>

@@ -1,3 +1,4 @@
+import { FieldLabel } from '../../components/FieldLabel';
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -117,7 +118,7 @@ export function Access({ mode }: { mode: "signup" | "login" }) {
               <form onSubmit={submit}>
                 {stage === 0 ? (
                   <>
-                    <label>
+                    <FieldLabel>
                       Your name
                       <Input
                         required
@@ -127,8 +128,8 @@ export function Access({ mode }: { mode: "signup" | "login" }) {
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Alex Morgan"
                       />
-                    </label>
-                    <label>
+                    </FieldLabel>
+                    <FieldLabel>
                       Work email
                       <Input
                         required
@@ -139,8 +140,8 @@ export function Access({ mode }: { mode: "signup" | "login" }) {
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="alex@company.com"
                       />
-                    </label>
-                    <label>
+                    </FieldLabel>
+                    <FieldLabel>
                       Company name
                       <Input
                         required
@@ -150,7 +151,7 @@ export function Access({ mode }: { mode: "signup" | "login" }) {
                         onChange={(e) => setCompany(e.target.value)}
                         placeholder="Your company"
                       />
-                    </label>
+                    </FieldLabel>
                   </>
                 ) : (
                   <div className="access-review">

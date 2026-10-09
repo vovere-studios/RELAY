@@ -32,3 +32,11 @@ These materials do not reproduce Apple's native lensing, automatic environmental
 - Mobile navigation in Light/Dark: independent body scroll and pinned account footer; choosing a destination worked. Escape closed its nested company selector while preserving the navigation dialog. Original Light preference and default viewport restored.
 - Warning/error log for the final fresh browser run was empty. Local screenshots remain in docs/qa/2026-10-09 and are not part of the application release.
 - No pending exchange/avatar migration, email setting, permission, purchase or VOVERE site change was performed. This is an interaction pass, not a claim that all remaining RELAY product capabilities are complete.
+
+## Follow-up: refresh, appearance and required controls
+
+- Replaced the unused `is-spinning` class on workspace refresh with a shared request-bound rotation. Desktop and mobile controls turn while fetching; completion continues to the next whole revolution instead of snapping home. Reduced motion uses the busy label/state without rotation.
+- Appearance now uses compact light/dark/system dashboard previews and one small selection indicator. The existing Settings section capsule remains. Modified keyboard shortcuts no longer get intercepted by that capsule.
+- Required label marks derive from the actual `required` property in workspace, request, upload and account forms. Label names are preserved for Select accessibility and concrete validation messages. Supplier rows use a restrained opacity response; text and arrows do not travel.
+- Profile photo chooser is a keyboard-accessible button with immediate MIME/size validation and repeat-selection handling. Production photo capability remains disabled: a read-only query confirmed the avatar column and private bucket are absent. Activation is pending explicit permission following the earlier approval-review rejection. No database or Storage permission was changed.
+- Browser proof: mobile refresh measured `aria-busy=true` with a rotated matrix, then `false` and transform `none`. Empty Supplier submit displayed marks only on its three required fields and still named them correctly. Light/Dark/System toggles and 320/390 px layouts checked without horizontal overflow; original Dark preference restored. Final browser warning/error log empty. TypeScript and production build passed.

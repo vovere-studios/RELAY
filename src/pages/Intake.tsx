@@ -1,3 +1,4 @@
+import { FieldLabel } from '../components/FieldLabel';
 import { formValidationMessage } from "../lib/form-validation";
 import { ActionButton, OutcomeMark, useActionFeedback } from "../components/ActionFeedback";
 import { IntakeWorkspaceShare } from "../components/CompanyExchange";
@@ -157,7 +158,7 @@ export function Intake() {
               <IntakeWorkspaceShare token={token} onSent={()=>setSent(true)}/>
               <div className="intake-upload-divider"><span>Or upload files directly</span></div>
               <form onSubmit={submit} onChange={()=>{feedback.reset("intake");setError("");}} onInvalidCapture={event=>{event.preventDefault();feedback.fail("intake");setError(formValidationMessage(event.currentTarget));}}>
-                <label>
+                <FieldLabel>
                   Your name
                   <Input
                     required
@@ -166,8 +167,8 @@ export function Intake() {
                     maxLength={100}
                     disabled={busy || feedback.phase("intake")==="success"}
                   />
-                </label>
-                <label>
+                </FieldLabel>
+                <FieldLabel>
                   Work email
                   <Input
                     required
@@ -177,16 +178,16 @@ export function Intake() {
                     maxLength={254}
                     disabled={busy || feedback.phase("intake")==="success"}
                   />
-                </label>
-                <label>
+                </FieldLabel>
+                <FieldLabel>
                   Document type
                   <Select name="kind" disabled={busy || feedback.phase("intake")==="success"}>
                     <option value="certificate">Certificate</option>
                     <option value="declaration">Declaration</option>
                     <option value="company">Company information</option>
                   </Select>
-                </label>
-                <label className="intake-drop">
+                </FieldLabel>
+                <FieldLabel className="intake-drop">
                   <Files size={25} />
                   <strong>
                     {files.length
@@ -209,7 +210,7 @@ export function Intake() {
                       setFiles([...(event.target.files || [])])
                     }
                   />
-                </label>
+                </FieldLabel>
                 {files.length > 0 && (
                   <ul className="intake-file-list">
                     {files.map((file, i) => (

@@ -660,3 +660,71 @@
   .workspace-navigation .dialog-material,.connected-app .topbar,.select-menu { background: var(--background); backdrop-filter: none; -webkit-backdrop-filter: none; border-color: var(--foreground); }
 }
 @media(prefers-reduced-motion:reduce) { .select-menu:popover-open { animation: none; } }
+
+/* A refresh is an operation, not an opacity-disabled decoration. */
+.refresh-glyph { transform-origin: center; transform-box: fill-box; }
+.workspace-refresh[aria-busy="true"], .navigation-refresh[aria-busy="true"] { opacity: 1; cursor: progress; }
+.workspace-refresh { border-radius: 12px; transition: background-color 180ms ease, transform 180ms var(--ease); }
+.workspace-refresh:active:not(:disabled) { transform: scale(.92); }
+.field-caption { display: inline-flex; gap: 4px; align-items: baseline; }
+.field-required { font-size: 12px; font-weight: 500; color: var(--muted); line-height: 1; }
+
+/* The preview explains the appearance, with one small selection signal. */
+.appearance-picker { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; max-width: 610px; margin-top: 28px; }
+.appearance-choice { padding: 8px; border: 1px solid transparent; border-radius: 18px; color: var(--foreground); background: transparent; text-align: left; min-width: 0; cursor: pointer; transition: border-color 220ms ease, background-color 220ms ease; }
+.appearance-choice[aria-pressed="true"] { border-color: var(--border); background: var(--hover); }
+.appearance-choice:focus-visible { outline: 2px solid var(--foreground); outline-offset: 3px; }
+.appearance-preview { --preview-bg: #f7f7f6; --preview-ink: #181818; --preview-panel: #fff; --preview-line: #dededc; position: relative; display: block; width: 100%; aspect-ratio: 1.58; overflow: hidden; border-radius: 11px; border: 1px solid var(--preview-line); background: var(--preview-bg); color: var(--preview-ink); transition: box-shadow 220ms ease; }
+.preview-dark { --preview-bg: #161616; --preview-ink: #eee; --preview-panel: #202020; --preview-line: #363636; }
+.preview-system::after { content: ""; position: absolute; inset: 0 0 0 50%; background: #fff; mix-blend-mode: difference; pointer-events: none; }
+.appearance-preview-bar { height: 17%; display: flex; align-items: center; gap: 3px; border-bottom: 1px solid var(--preview-line); padding-left: 9px; }
+.appearance-preview-bar i { width: 3px; height: 3px; background: #8b8b8b; border-radius: 50%; }
+.appearance-preview-sidebar { position: absolute; inset: 25% auto 10% 7%; width: 18%; display: flex; flex-direction: column; gap: 7px; }
+.appearance-preview-sidebar b { width: 70%; height: 5px; background: var(--preview-ink); border-radius: 1px; margin-bottom: 4px; }
+.appearance-preview-sidebar i { width: 80%; height: 3px; border-radius: 2px; background: #8b8b8b66; }
+.appearance-preview-content { position: absolute; inset: 28% 7% 10% 31%; display: flex; flex-direction: column; gap: 8px; }
+.appearance-preview-content > b { width: 74%; height: 6px; background: var(--preview-ink); border-radius: 2px; }
+.appearance-preview-content > span { display: flex; gap: 5px; flex: 1; min-height: 12px; }
+.appearance-preview-content i { flex: 1; border: 1px solid var(--preview-line); border-radius: 4px; background: var(--preview-panel); }
+.appearance-preview-content em { height: 3px; width: 92%; border-radius: 2px; background: #8b8b8b55; }
+.appearance-preview-content em:last-child { width: 67%; }
+.appearance-choice-caption { display: flex; align-items: center; gap: 7px; margin: 12px 2px 4px; }
+.appearance-choice-caption strong { font-size: 13px; font-weight: 500; }
+.appearance-choice small { display: block; margin: 0 2px 4px; font-size: 11px; line-height: 1.5; color: var(--muted); }
+.appearance-selection { width: 12px; height: 12px; border: 1px solid var(--border); border-radius: 50%; margin-left: auto; display: grid; place-items: center; flex-shrink: 0; }
+.appearance-selection::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--foreground); transform: scale(0); transition: transform 280ms cubic-bezier(.2,.85,.25,1); }
+.appearance-choice[aria-pressed="true"] .appearance-selection { border-color: var(--foreground); }
+.appearance-choice[aria-pressed="true"] .appearance-selection::after { transform: scale(1); }
+
+/* Reading a supplier should not move the record or bounce its symbols. */
+.connected-company-row { position: relative; isolation: isolate; border-radius: 14px; background: transparent; transition: none; }
+.connected-company-row::before { content: ''; position: absolute; inset: 3px -8px; z-index: -1; border-radius: 14px; background: var(--hover); opacity: 0; transition: opacity 180ms ease; pointer-events: none; }
+.connected-company-row > svg { opacity: .4; transition: opacity 180ms ease; }
+.connected-company-row:active::before, .connected-company-row:focus-visible::before { opacity: 1; }
+@media (hover:hover) and (pointer:fine) {
+ .connected-company-row:hover { background: transparent; }
+ .connected-company-row:hover::before { opacity: 1; }
+ .connected-company-row:hover > svg { opacity: 1; }
+ .appearance-choice:hover .appearance-preview { box-shadow: 0 4px 12px -7px #0006; }
+}
+@media (max-width:600px) {
+ .appearance-picker { gap: 6px; margin-top: 22px; }
+ .appearance-choice { padding: 5px; border-radius: 13px; }
+ .appearance-choice-caption { gap: 4px; margin-top: 10px; }
+ .appearance-choice-caption svg { width: 13px; }
+ .appearance-choice-caption strong { font-size: 12px; }
+ .appearance-choice small { font-size: 10px; }
+ .appearance-selection { width: 10px; height: 10px; }
+ .appearance-selection::after { width: 4px; height: 4px; }
+ .appearance-preview-content { gap: 5px; }
+ .appearance-preview-sidebar { gap: 5px; }
+}
+@media (max-width:360px) {
+ .appearance-choice-caption svg { display: none; }
+ .appearance-choice small { min-height: 30px; }
+}
+@media (prefers-reduced-motion:reduce) {
+ .workspace-refresh, .appearance-choice, .appearance-preview, .appearance-selection::after,
+ .connected-company-row::before, .connected-company-row > svg { transition: none; }
+ .workspace-refresh:active:not(:disabled) { transform: none; }
+}

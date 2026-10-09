@@ -51,6 +51,7 @@ export function SegmentedControl({ value, options, onChange, label, className = 
   useLayoutEffect(() => () => animation.current?.cancel(), []);
   return <div ref={root} className={`segmented-control ${className}`} role="group" aria-label={label}
     onKeyDown={event => {
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
       if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
       const buttons = [...root.current!.querySelectorAll('button')];
       const index = buttons.indexOf(event.target as HTMLButtonElement);

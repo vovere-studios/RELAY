@@ -1,3 +1,4 @@
+import { FieldLabel } from '../components/FieldLabel';
 import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { PublicHeader, PublicFooter } from "./marketing/Website";
@@ -79,7 +80,7 @@ export function AccountSecurity({ recovery = false }: { recovery?: boolean }) {
           ) : (
             <form onSubmit={submit}>
               {recovery ? (
-                <label>
+                <FieldLabel>
                   Work email
                   <Input
                     required
@@ -88,11 +89,11 @@ export function AccountSecurity({ recovery = false }: { recovery?: boolean }) {
                     autoComplete="email"
                     defaultValue={email}
                   />
-                </label>
+                </FieldLabel>
               ) : (
                 <>
                   <p>{email}</p>
-                  <label>
+                  <FieldLabel>
                     New password
                     <Input
                       required
@@ -102,8 +103,8 @@ export function AccountSecurity({ recovery = false }: { recovery?: boolean }) {
                       minLength={8}
                       maxLength={128}
                     />
-                  </label>
-                  <label>
+                  </FieldLabel>
+                  <FieldLabel>
                     Confirm password
                     <Input
                       required
@@ -113,7 +114,7 @@ export function AccountSecurity({ recovery = false }: { recovery?: boolean }) {
                       minLength={8}
                       maxLength={128}
                     />
-                  </label>
+                  </FieldLabel>
                 </>
               )}
               {error && (

@@ -6,7 +6,7 @@ export function formValidationMessage(form: HTMLFormElement): string {
   if (malformedEmail) return "Enter a valid work email address, for example name@company.com.";
   const names = [...new Set(fields.map(field => {
     const label = field.labels?.[0];
-    const text = label ? Array.from(label.childNodes).filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.textContent).join(" ").trim() : "";
+    const text = label?.querySelector("[data-field-name]")?.textContent?.trim() || (label ? Array.from(label.childNodes).filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.textContent).join(" ").trim() : "");
     return (text || field.name.replace(/[_-]/g, " ") || "required information").toLowerCase();
   }))];
   if (!names.length) return "Complete the highlighted fields to continue.";

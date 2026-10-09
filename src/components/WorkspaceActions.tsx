@@ -1,3 +1,4 @@
+import { FieldLabel } from './FieldLabel';
 import { LoadingIndicator } from './ui';
 import { Select } from './Select';
 import { useState, type FormEvent } from "react";
@@ -63,7 +64,7 @@ export function AddSupplier() {
       >
         <p>Add a supplier identity to your local network.</p>
         <form className="workspace-form" onSubmit={submit}>
-          <label>
+          <FieldLabel>
             Company name
             <Input
               name="name"
@@ -71,9 +72,9 @@ export function AddSupplier() {
               maxLength={160}
               placeholder="Company GmbH"
             />
-          </label>
+          </FieldLabel>
           <div className="form-grid">
-            <label>
+            <FieldLabel>
               Country
               <Select required name="country" defaultValue="">
                 <option value="" disabled>
@@ -85,8 +86,8 @@ export function AddSupplier() {
                   </option>
                 ))}
               </Select>
-            </label>
-            <label>
+            </FieldLabel>
+            <FieldLabel>
               Category
               <Input
                 name="category"
@@ -94,9 +95,9 @@ export function AddSupplier() {
                 maxLength={100}
                 placeholder="Precision components"
               />
-            </label>
+            </FieldLabel>
           </div>
-          <label>
+          <FieldLabel>
             Contact email <span>(optional)</span>
             <Input
               name="email"
@@ -104,7 +105,7 @@ export function AddSupplier() {
               maxLength={254}
               placeholder="contact@company.com"
             />
-          </label>
+          </FieldLabel>
           {error && (
             <p className="form-error" role="alert">
               {error}
@@ -201,7 +202,7 @@ export function UploadDocument({ supplierId }: { supplierId?: string }) {
           device.
         </p>
         <form className="workspace-form" onSubmit={submit}>
-          <label>
+          <FieldLabel>
             Supplier
             <Select name="supplier" required defaultValue={supplierId || ""}>
               <option value="" disabled>
@@ -213,16 +214,16 @@ export function UploadDocument({ supplierId }: { supplierId?: string }) {
                 </option>
               ))}
             </Select>
-          </label>
-          <label>
+          </FieldLabel>
+          <FieldLabel>
             Document type
             <Select name="kind">
               <option value="certificate">Certificate</option>
               <option value="declaration">Declaration</option>
               <option value="company">Company information</option>
             </Select>
-          </label>
-          <label className="file-drop">
+          </FieldLabel>
+          <FieldLabel className="file-drop">
             <Upload size={26} />
             <strong>Choose your document</strong>
             <span>PDF, PNG or JPEG · Maximum 10 MB</span>
@@ -232,7 +233,7 @@ export function UploadDocument({ supplierId }: { supplierId?: string }) {
               type="file"
               accept="application/pdf,image/png,image/jpeg"
             />
-          </label>
+          </FieldLabel>
           {error && (
             <p className="form-error" role="alert">
               {error}
@@ -300,7 +301,7 @@ export function EditOrganization() {
         title="Your company identity."
       >
         <form className="workspace-form" onSubmit={submit}>
-          <label>
+          <FieldLabel>
             Legal name
             <Input
               name="name"
@@ -308,9 +309,9 @@ export function EditOrganization() {
               required
               maxLength={160}
             />
-          </label>
+          </FieldLabel>
           <div className="form-grid">
-            <label>
+            <FieldLabel>
               Country code
               <Input
                 name="country"
@@ -319,24 +320,24 @@ export function EditOrganization() {
                 pattern="[A-Za-z]{2}"
                 maxLength={2}
               />
-            </label>
-            <label>
+            </FieldLabel>
+            <FieldLabel>
               Registration number
               <Input
                 name="registration"
                 defaultValue={organization.registrationNumber}
                 maxLength={100}
               />
-            </label>
+            </FieldLabel>
           </div>
-          <label>
+          <FieldLabel>
             Website
             <Input
               name="website"
               defaultValue={organization.website}
               maxLength={254}
             />
-          </label>
+          </FieldLabel>
           <Button type="submit">
             Save changes <CheckSmall />
           </Button>
@@ -390,7 +391,7 @@ export function EditSupplier({ supplierId }: { supplierId: string }) {
         <form className="workspace-form" onSubmit={submit}>
           <div className="form-grid">
             {fields.map((f) => (
-              <label key={f.key}>
+              <FieldLabel key={f.key}>
                 {f.label}
                 <Input
                   name={f.key}
@@ -401,7 +402,7 @@ export function EditSupplier({ supplierId }: { supplierId: string }) {
                     supplier[f.key] === "Not provided" ? "" : supplier[f.key]
                   }
                 />
-              </label>
+              </FieldLabel>
             ))}
           </div>
           <Button type="submit">
@@ -465,7 +466,7 @@ export function CreateRequest() {
           Collect the missing requirements for a supplier into a local request.
         </p>
         <form className="workspace-form" onSubmit={submit}>
-          <label>
+          <FieldLabel>
             Supplier
             <Select required name="supplier" defaultValue="">
               <option value="" disabled>
@@ -477,8 +478,8 @@ export function CreateRequest() {
                 </option>
               ))}
             </Select>
-          </label>
-          <label>
+          </FieldLabel>
+          <FieldLabel>
             Request title
             <Input
               required
@@ -486,8 +487,8 @@ export function CreateRequest() {
               maxLength={160}
               placeholder="Please provide your missing compliance documents"
             />
-          </label>
-          <label>
+          </FieldLabel>
+          <FieldLabel>
             Due date
             <Input
               required
@@ -495,7 +496,7 @@ export function CreateRequest() {
               name="due"
               min={new Date().toISOString().slice(0, 10)}
             />
-          </label>
+          </FieldLabel>
           {error && (
             <p role="alert" className="form-error">
               {error}
