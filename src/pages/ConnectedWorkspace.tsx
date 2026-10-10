@@ -1,6 +1,7 @@
 import { GeneratedLink } from '../components/GeneratedLink';
 import { SavedSupplierSearches } from '../components/SavedSupplierSearches';
 import { RequestDetails } from '../components/RequestDetails';
+import { SupplierRequests } from '../components/SupplierRequests';
 import { ProductDetails } from '../components/ProductDetails';
 import { ConnectedSearch } from '../components/ConnectedSearch';
 import { WorkspaceInbox } from '../components/WorkspaceInbox';
@@ -614,6 +615,7 @@ export function ConnectedWorkspace() {
   const generatedCard = generated && <GeneratedLink invitation={dialog==="invite"} url={generated} message={dialog==="invite" ? inviteDelivery || "Send this invitation to your teammate to join the workspace." : undefined} phase={feedback.phase("copy")} outcomeKey={feedback.version("copy")} onCopy={()=>void copy(generated)}/>;
   const supplierWorkspace = supplier && data && (
           <>
+            <SupplierRequests organizationId={data.org.id} supplierId={supplier.id} revision={data} onOpen={id=>{const next=new URLSearchParams(params);next.set("focus",id);setParams(next);}}/>
             <SegmentedControl className="connected-detail-tabs" label="Supplier section" value={detailTab}
               options={["Company", "Documents", "Requirements", "Certificates"].map(tab => ({ value: tab, label: tab }))}
               onChange={tab => depart(()=>{setSupplierDirty(false);setSupplierEditing(false);setDetailTab(tab);})}/>
@@ -737,7 +739,9 @@ export function ConnectedWorkspace() {
                 </>
               )}
               {detailTab === "Requirements" && (
-                <>
+                <div className="supplier-requirements">
+                  <div className="supplier-section-heading"><div><h2>Requirements</h2><p>Review each requirement and connect the evidence that supports it.</p></div></div>
+                  {!data.requirements.some(requirement=>requirement.relationship_id===relationship?.id) && <p className="quiet-note">No requirements configured for this supplier.</p>}
                   {data.requirements
                     .filter(
                       (requirement) =>
@@ -766,8 +770,8 @@ export function ConnectedWorkspace() {
                           );
                         }}
                       >
-                        <div>
-                          <strong>{requirement.name}</strong>
+                        <div className="requirement-heading">
+                          <div><strong>{requirement.name}</strong><small>{requirement.kind === "company" ? "Company information" : "Supporting document"}</small></div>
                           <Badge>
                             {requirement.status === "satisfied"
                               ? "Complete"
@@ -809,7 +813,7 @@ export function ConnectedWorkspace() {
                         )}
                       </form>
                     ))}
-                </>
+                </div>
               )}
               {detailTab === "Certificates" && (
                 <>

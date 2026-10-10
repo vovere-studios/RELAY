@@ -64,3 +64,11 @@ Guest confirmation endpoint accepts the secret link token, completed reservation
 Supabase relay-intake deployed as version 4, preserving existing verify_jwt=false capability-link validation. Only added document_ids/reservation_id to the successful response; previous deployed source compared before update. Existing clients remain compatible. No schema migration added. Real emails were not sent during QA. Actual inbox delivery requires publishing the frontend/server update and a new approved submission.
 
 Mail SDK tests passed: sender/requester routing, HTML escaping, guest copy (no false claim of stored originals), retry idempotency, rejected provider response and network failure. Production build and invalid-request endpoint checks recorded separately.
+
+## Supplier requests and requirements
+
+Added a supplier-scoped, tenant-filtered open-request query with ten-row pagination, timeout, cancellation and inline retry. The section stays above all supplier tabs and opens the existing request details without leaving the supplier. Received requests are excluded. Reloading the workspace after request creation refreshes this section.
+
+Verified against existing Vertex GmbH requests: ISO2009 and TEST both appear, ordered by due date; opening ISO2009 from the supplier shows the correct request and supplier. No production records were created or changed for this check. Day & Night Service correctly shows no open requests.
+
+Requirements now separate the name, evidence type and status in a dedicated heading, with evidence and action controls below. Checked real requirements at CSS widths 1280 and 390; mobile has no horizontal overflow. Production build and diff whitespace checks passed. Screenshots: supplier-open-requests.png, supplier-requirements-mobile.png.
