@@ -83,7 +83,7 @@
 
 
 
-  .button:hover .action-icon-request { transform: translate(-1px, 1px) scale(.94); transform-origin: 12px 12px; }
+  .button:hover .action-icon-request { transform: translateY(1.5px); transform-origin: 19px 15px; }
 }
 
 /* One calm surface, with a fixed header and its own scroll area. */
@@ -822,3 +822,39 @@
 .saved-search-pill { max-width:100%; }
 .saved-search-pill button:first-child { min-width:0; white-space:normal; overflow-wrap:anywhere; text-align:left; text-overflow:clip; line-height:1.5; }
 @media(pointer:coarse) { .saved-search-pill button { min-height:44px; } .saved-search-pill button:last-child { min-width:44px; } .search-start button { min-height:44px; } }
+/* The result unfolds from the generating control, without moving its own contents. */
+.generated-link-reveal { overflow:hidden; margin-top:14px; border-radius:22px; }
+.generated-link-reveal .generated-link { margin:0; padding:24px; gap:20px; border:1px solid var(--border); background:var(--surface); border-radius:22px; transform-origin:top center; }
+.generated-link-heading { display:flex; gap:13px; align-items:flex-start; }
+.generated-link-symbol { display:grid; place-items:center; flex:0 0 38px; height:38px; border:1px solid var(--border); border-radius:12px; background:var(--background); }
+.generated-link-heading strong { display:block; font-size:15px; font-weight:550; letter-spacing:-.02em; line-height:1.5; }
+.generated-link-heading p { color:var(--muted); margin-top:4px; font-size:12px; }
+.generated-link-controls { display:flex; gap:10px; align-items:center; min-width:0; }
+.generated-link-controls input { flex:1; min-width:0; width:0; height:46px; font-size:12px; background:var(--background); border-radius:12px; }
+.generated-link-controls>.button { flex-shrink:0; min-height:46px; }
+.generated-link-footer { display:flex; justify-content:space-between; align-items:center; gap:16px; font-size:11px; color:var(--muted); line-height:1.6; }
+.generated-link-footer a { display:inline-flex; align-items:center; gap:6px; color:var(--foreground); flex-shrink:0; min-height:32px; }
+@media(max-width:600px) { .generated-link-reveal .generated-link { padding:18px; gap:16px; }.generated-link-controls { flex-wrap:wrap; }.generated-link-controls input { flex-basis:100%; width:100%; }.generated-link-controls>.button { width:100%; }.generated-link-footer { align-items:flex-start; }.generated-link-footer a { min-height:44px; }.generated-link-footer>span { padding-top:12px; } }
+
+/* The response stays inside the recipient's workspace, with a quiet request summary. */
+.intake-entry-options { display:grid; gap:14px; padding:24px 0; }
+.intake-entry-options .button { width:100%; }
+.intake-entry-options p { margin:0; font-size:13px; line-height:1.6; color:var(--muted); }
+.intake-create-account { display:flex; align-items:center; gap:10px; font-size:13px; line-height:1.6; text-decoration:underline; text-underline-offset:4px; }
+.intake-response { max-width:860px; padding:clamp(24px,4vw,48px); }
+.intake-response-heading { margin-bottom:32px; padding-bottom:28px; border-bottom:1px solid var(--border); }
+.intake-response h2 { font-size:clamp(26px,4vw,38px); letter-spacing:-.045em; line-height:1.2; overflow-wrap:anywhere; margin:14px 0; }
+.intake-response p { color:var(--muted); font-size:14px; line-height:1.7; }
+.intake-response-alternatives { display:grid; gap:12px; margin-top:32px; padding-top:24px; border-top:1px solid var(--border); }
+.intake-response-alternatives .button { justify-self:start; }
+.intake-response-delivered { display:grid; justify-items:start; gap:16px; }
+@media(min-width:901px) { .intake-main { padding-top:140px; } }
+@media(prefers-reduced-motion:no-preference) { .intake-response-delivered { animation:response-arrive 480ms cubic-bezier(.2,.8,.2,1) both; } }
+@keyframes response-arrive { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+
+.action-icon-request-line { transition:stroke-dashoffset 420ms cubic-bezier(.2,.8,.2,1); stroke-dasharray:8; stroke-dashoffset:0; }
+@media(hover:hover) and (prefers-reduced-motion:no-preference) { .button:hover .action-icon-request-line { stroke-dashoffset:2; } }
+
+.response-new-document { margin-top:24px; }
+.response-upload-form { display:grid; gap:20px; padding:24px 0; }
+.response-upload-form > label { display:grid; gap:10px; }

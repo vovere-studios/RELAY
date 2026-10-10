@@ -1,3 +1,4 @@
+import { GeneratedLink } from '../components/GeneratedLink';
 import { SavedSupplierSearches } from '../components/SavedSupplierSearches';
 import { RequestDetails } from '../components/RequestDetails';
 import { ProductDetails } from '../components/ProductDetails';
@@ -11,6 +12,7 @@ import { formValidationMessage } from "../lib/form-validation";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { WorkspaceInsights } from "../components/WorkspaceInsights";
 import { AccountProfile, useAccountProfile } from "../components/AccountProfile";
+import { IntakeResponse } from '../components/IntakeResponse';
 import { CompanyExchange } from "../components/CompanyExchange";
 import { SupplierTrash } from "../components/SupplierTrash";
 import { Trash2 } from "lucide-react";
@@ -117,6 +119,7 @@ const sections = [
   { id: "settings", label: "Settings", icon: Settings },
 ];
 const titles: Record<string, [string, string]> = {
+  response: ["A simpler way to send.", "Choose the documents you want to share. You stay in control."],
   inbox: ["Your next steps.", "Requests, document reviews and deadlines. One place to move forward."],
   overview: [
     "Your network. In focus.",
@@ -171,11 +174,10 @@ export function ConnectedWorkspace() {
   const feedback = useActionFeedback();
   const [layoutSaved, setLayoutSaved] = useState(true);
   const [params, setParams] = useSearchParams();
-  const view = sections.some((section) => section.id === params.get("view"))
+  const view = params.get("return") === "intake" ? "response" : sections.some((section) => section.id === params.get("view"))
     ? params.get("view")!
     : "overview";
   const orgParam = params.get("org");
-  const returnToIntake = params.get("return") === "intake";
   const page = Math.max(0, Math.min(100000, Math.floor(Number(params.get("page")) || 0)));
   const { resolved, setPreference } = useTheme();
   const [settingsDirty, setSettingsDirty] = useState(false);
@@ -279,7 +281,7 @@ export function ConnectedWorkspace() {
         user = auth.data.user;
         currentUser.current = user;
       }
-      const payload = { organization_id:orgParam, view: view === "inbox" ? "overview" : view, page, query:searchTerms.query, lookup:searchTerms.lookup, selected, detail_page:detailPage, detail_tab:detailTab, dialog };
+      const payload = { organization_id:orgParam, view: ["inbox","response"].includes(view) ? "overview" : view, page, query:searchTerms.query, lookup:searchTerms.lookup, selected, detail_page:detailPage, detail_tab:detailTab, dialog };
       let result = checkResult(await client.rpc("relay_workspace_snapshot", {payload}).abortSignal(controller.signal)).data as unknown as Omit<Data,"user"|"view"> & {needs_workspace?:boolean};
       if (result.needs_workspace) {
         checkResult(await client.rpc("create_workspace", {company_name:String(user.user_metadata.company_name || "My company"),full_name:String(user.user_metadata.full_name || "")}));
@@ -296,12 +298,6 @@ export function ConnectedWorkspace() {
     }
   }, [navigate, orgParam, view, page, searchTerms, selected, detailPage, detailTab, dialog]);
   useEffect(() => { void load(); return () => { generation.current++; requestController.current?.abort(); }; }, [load]);
-  useEffect(() => {
-    if (loading || !data || !returnToIntake) return;
-    const token = sessionStorage.getItem("relay-pending-intake");
-    // Finish the existing workspace bootstrap before returning a new account to its request.
-    navigate(token ? `/submit#token=${encodeURIComponent(token)}` : `/cloud?org=${data.org.id}`, {replace:true});
-  },[data,loading,returnToIntake,navigate]);
   useEffect(() => {
     const {data:{subscription}} = requireSupabase().auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT") { currentUser.current=null; navigate("/login",{replace:true}); }
@@ -491,7 +487,8 @@ export function ConnectedWorkspace() {
         )
           throw new Error("Choose a PDF, PNG or JPEG up to 10 MB.");
         const id = crypto.randomUUID();
-        const path = `${data.org.id}/${field(form, "supplier")}/${id}/${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+        const documentSupplier = field(form, "supplier") === "company" ? null : field(form, "supplier");
+        const path = `${data.org.id}/${documentSupplier || "company"}/${id}/${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
         checkResult(
           await client.storage
             .from("relay-documents")
@@ -502,7 +499,7 @@ export function ConnectedWorkspace() {
           .insert({
             id,
             organization_id: data.org.id,
-            supplier_id: field(form, "supplier"),
+            supplier_id: documentSupplier,
             name: file.name,
             kind: field(form, "kind"),
             mime_type: file.type,
@@ -614,24 +611,7 @@ export function ConnectedWorkspace() {
   const relationship = data?.health.find((row) => row.supplier_id === selected);
   const shownSuppliers = data?.suppliers.filter(company => data.listSupplierIds.includes(company.id)) || [];
   const title = titles[view];
-  const generatedCard = generated && (
-    <div className="generated-link">
-      <strong>Your private link</strong>
-      <p>{dialog==="invite"&&inviteDelivery?inviteDelivery:"Copy it now. Relay stores only its protected fingerprint."}</p>
-      <div>
-        <Input
-          readOnly
-          aria-label="Generated private link"
-          value={generated}
-          onFocus={(event) => event.currentTarget.select()}
-        />
-        <ActionButton variant="secondary" phase={feedback.phase("copy")} outcomeKey={feedback.version("copy")} label="Copy link" pendingLabel="Copying…" successLabel="Copied" onClick={() => void copy(generated)}/>
-      </div>
-      <a href={generated} target="_blank" rel="noopener noreferrer">
-        Preview the link <ArrowUpRight size={14} />
-      </a>
-    </div>
-  );
+  const generatedCard = generated && <GeneratedLink invitation={dialog==="invite"} url={generated} message={dialog==="invite" ? inviteDelivery || "Send this invitation to your teammate to join the workspace." : undefined} phase={feedback.phase("copy")} outcomeKey={feedback.version("copy")} onCopy={()=>void copy(generated)}/>;
   const supplierWorkspace = supplier && data && (
           <>
             <SegmentedControl className="connected-detail-tabs" label="Supplier section" value={detailTab}
@@ -955,14 +935,14 @@ export function ConnectedWorkspace() {
           <Link className="mobile-workspace-brand" to="/" aria-label="Relay home">relay<span>↗</span></Link>
           <button className="workspace-location" aria-label="Open navigation" aria-haspopup="dialog"
             aria-expanded={menu} aria-controls="workspace-navigation" onClick={()=>setMenu(true)}>
-            <span>{view === "directory" ? "Discover" : sections.find(section=>section.id === view)?.label}</span>
+            <span>{view === "directory" ? "Discover" : (view === "response" ? "Send documents" : sections.find(section=>section.id === view)?.label)}</span>
             <ChevronDown size={14}/>
           </button>
           <div className="breadcrumb">
             <span>Workspace</span>
             <span className="crumb-separator">/</span>
             <span>
-              {sections.find((section) => section.id === view)?.label}
+              {(view === "response" ? "Send documents" : sections.find((section) => section.id === view)?.label)}
             </span>
           </div>
           <div className="topbar-right">
@@ -1056,6 +1036,7 @@ export function ConnectedWorkspace() {
           ) : (
             <MotionPanel identity={`${data.org.id}-${view}-${selected || "list"}`} compact>
               {selected ? <div className="supplier-workspace">{supplierWorkspace || <EmptyState title="Supplier unavailable." description="This connection may have been removed. Return to your supplier list."/>}</div> : <>
+              {view === "response" && <IntakeResponse organizationId={data.org.id} manager={manager}/>}
               {view === "overview" && (
                 <>
                   <div className="overview-tools"><span className="quiet-note">Your workspace at a glance.</span><Button variant="ghost" onClick={()=>setCustomize(true)}><ActionIcon kind="adjust"/>Customize overview</Button></div>
@@ -1925,6 +1906,7 @@ export function ConnectedWorkspace() {
                     Supplier
                     <Select required name="connection" defaultValue={relationship?.id || ""} disabled={refreshing}>
                       <option value="">Choose a supplier</option>
+
                       {data.health.filter(row=>data.suppliers.some(company=>company.id===row.supplier_id && company.legal_name.toLowerCase().includes(searchTerms.lookup.toLowerCase()))).map((row) => (
                         <option key={row.id} value={row.id || ""}>
                           {
@@ -1957,9 +1939,10 @@ export function ConnectedWorkspace() {
                 <>
                   <FieldLabel>Find a supplier<Input type="search" value={lookupQuery} onChange={event=>setLookupQuery(event.target.value)} placeholder="Search your suppliers…"/></FieldLabel>
                   <FieldLabel>
-                    Supplier
+                    {dialog === "document" ? "Belongs to" : "Supplier"}
                     <Select required name="supplier" defaultValue={selected || ""} disabled={refreshing}>
                       <option value="">Choose a supplier</option>
+                      {dialog === "document" && <option value="company">My company · {data.org.legal_name}</option>}
                       {data.suppliers.filter(company=>company.legal_name.toLowerCase().includes(searchTerms.lookup.toLowerCase())).map((company) => (
                         <option key={company.id} value={company.id}>
                           {company.legal_name}
@@ -2009,7 +1992,7 @@ export function ConnectedWorkspace() {
               <div className="action-form-footer">
               {error && <p className="form-feedback-error" role="alert"><OutcomeMark tone="error"/><span>{error}</span></p>}
               <ActionButton type="submit" phase={feedback.phase("dialog")} outcomeKey={feedback.version("dialog")} errorLabel={error.startsWith("Complete ") ? "Check details" : "Try again"}
-                disabled={busy || ((dialog === "document" || dialog === "request" || dialog === "product") && !data.suppliers.length)}
+                disabled={busy || ((dialog === "request" || dialog === "product") && !data.suppliers.length)}
                 label={dialog === "invite" ? "Create invitation" : dialog === "share" ? "Share selected documents" : "Save to workspace"}
                 successLabel={dialog === "invite" ? "Invitation ready" : dialog === "share" ? "Documents shared" : dialog === "request" ? "Request created" : "Saved to workspace"}
                 pendingLabel={dialog === "document" ? "Uploading…" : "Saving…"}/>

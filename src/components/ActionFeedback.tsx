@@ -120,8 +120,9 @@ export function ActionIcon({ kind = "add" }: { kind?: "add" | "upload" | "adjust
       <path className="action-icon-knob action-icon-knob-b" d="M16 9v6"/>
       <path className="action-icon-knob action-icon-knob-c" d="M10 15v6"/>
     </> : <>
-      <path className="action-icon-frame" d="M9 4H4v16h16v-5"/>
-      <g className="action-icon-request"><path d="M10 14 20 4m-6 0h6v6"/></g>
+      <path className="action-icon-frame" d="M6 3h8l4 4v14H6V3m8 0v5h4"/>
+      <path className="action-icon-request-line" d="M9 12h6M9 16h4"/>
+      <g className="action-icon-request"><path d="M19 11v7m-3-3 3 3 3-3"/></g>
     </>}
   </svg>;
 }

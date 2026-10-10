@@ -260,7 +260,7 @@ export type Database = {
           storage_path: string
           submitted_by_email: string | null
           submitted_by_name: string | null
-          supplier_id: string
+          supplier_id: string | null
           uploaded_at: string
           uploaded_by: string | null
           verification_status: string
@@ -275,7 +275,7 @@ export type Database = {
           storage_path: string
           submitted_by_email?: string | null
           submitted_by_name?: string | null
-          supplier_id: string
+          supplier_id: string | null
           uploaded_at?: string
           uploaded_by?: string | null
           verification_status?: string
@@ -290,7 +290,7 @@ export type Database = {
           storage_path?: string
           submitted_by_email?: string | null
           submitted_by_name?: string | null
-          supplier_id?: string
+          supplier_id?: string | null
           uploaded_at?: string
           uploaded_by?: string | null
           verification_status?: string

@@ -61,14 +61,14 @@ export function DocumentPreview({ id, organizationId, manager, onClose, onChange
     {loading && <LoadingIndicator label="Opening your document…"/>}
     {error && <InlineError message={error} onRetry={()=>setRetry(value=>value+1)}/>}
     {document && <>
-      <div className="document-preview-meta"><span><Files size={15}/>{document.kind}</span><span>Uploaded {dateLabel(document.uploaded_at)}</span><Badge>{document.verification_status==='verified'?'Reviewed':'Awaiting review'}</Badge></div>
+      <div className="document-preview-meta"><span><Files size={15}/>{document.kind==='company'?'Company information':document.kind==='certificate'?'Certificate':document.kind==='declaration'?'Declaration':document.kind}</span><span>Uploaded {dateLabel(document.uploaded_at)}</span><Badge>{document.verification_status==='verified'?'Reviewed':'Awaiting review'}</Badge></div>
       {url && <div className="document-preview-content">{document.mime_type.startsWith('image/') ? <img src={url} alt={document.name}/> : <object data={url} type="application/pdf" aria-label={`Preview ${document.name}`}><div className="document-preview-fallback"><Files size={30}/><p>Your browser cannot display this PDF inline.</p><a href={url} download={document.name}>Download PDF<Download size={16}/></a></div></object>}</div>}
       <div className="document-preview-actions">
         {url && <a className="button button-secondary" href={url} download={document.name}><Download size={16}/>Download</a>}
         {manager && document.organization_id===organizationId && <ActionButton label="Mark as reviewed" pendingLabel="Saving review…" successLabel="Review saved" phase={feedback.phase('review')} outcomeKey={feedback.version('review')} disabled={document.verification_status==='verified' || loading || !url} onClick={()=>void review()}/>}
       </div>
       <p className="document-preview-note"><ShieldCheck size={15}/>Access follows your company’s document permissions. Reviewing does not verify the document’s legal validity.</p>
-      {document.organization_id===organizationId && <Link className="text-link" to={`/cloud?org=${organizationId}&view=suppliers&supplier=${document.supplier_id}&tab=Documents`}>Open supplier workspace<ArrowUpRight size={15}/></Link>}
+      {document.organization_id===organizationId && document.supplier_id && <Link className="text-link" to={`/cloud?org=${organizationId}&view=suppliers&supplier=${document.supplier_id}&tab=Documents`}>Open supplier workspace<ArrowUpRight size={15}/></Link>}
     </>}
   </Dialog>;
 }

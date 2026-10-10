@@ -14,6 +14,7 @@ import { Route as SplatRouteImport } from './routes/$'
 import { Route as ApiAdminActionRouteImport } from './routes/api/admin/action'
 import { Route as ApiAuthEmailHookRouteImport } from './routes/api/auth/email-hook'
 import { Route as ApiWorkspaceInviteRouteImport } from './routes/api/workspace/invite'
+import { Route as ApiWorkspaceSubmissionEmailRouteImport } from './routes/api/workspace/submission-email'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 
 const IndexRoute = IndexRouteImport.update({
@@ -41,6 +42,12 @@ const ApiWorkspaceInviteRoute = ApiWorkspaceInviteRouteImport.update({
   path: '/api/workspace/invite',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWorkspaceSubmissionEmailRoute =
+  ApiWorkspaceSubmissionEmailRouteImport.update({
+    id: '/api/workspace/submission-email',
+    path: '/api/workspace/submission-email',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const LovableEmailTransactionalPreviewRoute =
   LovableEmailTransactionalPreviewRouteImport.update({
     id: '/lovable/email/transactional/preview',
@@ -54,6 +61,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/action': typeof ApiAdminActionRoute
   '/api/auth/email-hook': typeof ApiAuthEmailHookRoute
   '/api/workspace/invite': typeof ApiWorkspaceInviteRoute
+  '/api/workspace/submission-email': typeof ApiWorkspaceSubmissionEmailRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
 }
 export interface FileRoutesByTo {
@@ -62,6 +70,7 @@ export interface FileRoutesByTo {
   '/api/admin/action': typeof ApiAdminActionRoute
   '/api/auth/email-hook': typeof ApiAuthEmailHookRoute
   '/api/workspace/invite': typeof ApiWorkspaceInviteRoute
+  '/api/workspace/submission-email': typeof ApiWorkspaceSubmissionEmailRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
 }
 export interface FileRoutesById {
@@ -71,6 +80,7 @@ export interface FileRoutesById {
   '/api/admin/action': typeof ApiAdminActionRoute
   '/api/auth/email-hook': typeof ApiAuthEmailHookRoute
   '/api/workspace/invite': typeof ApiWorkspaceInviteRoute
+  '/api/workspace/submission-email': typeof ApiWorkspaceSubmissionEmailRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
 }
 export interface FileRouteTypes {
@@ -81,6 +91,7 @@ export interface FileRouteTypes {
     | '/api/admin/action'
     | '/api/auth/email-hook'
     | '/api/workspace/invite'
+    | '/api/workspace/submission-email'
     | '/lovable/email/transactional/preview'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -89,6 +100,7 @@ export interface FileRouteTypes {
     | '/api/admin/action'
     | '/api/auth/email-hook'
     | '/api/workspace/invite'
+    | '/api/workspace/submission-email'
     | '/lovable/email/transactional/preview'
   id:
     | '__root__'
@@ -97,6 +109,7 @@ export interface FileRouteTypes {
     | '/api/admin/action'
     | '/api/auth/email-hook'
     | '/api/workspace/invite'
+    | '/api/workspace/submission-email'
     | '/lovable/email/transactional/preview'
   fileRoutesById: FileRoutesById
 }
@@ -106,6 +119,7 @@ export interface RootRouteChildren {
   ApiAdminActionRoute: typeof ApiAdminActionRoute
   ApiAuthEmailHookRoute: typeof ApiAuthEmailHookRoute
   ApiWorkspaceInviteRoute: typeof ApiWorkspaceInviteRoute
+  ApiWorkspaceSubmissionEmailRoute: typeof ApiWorkspaceSubmissionEmailRoute
   LovableEmailTransactionalPreviewRoute: typeof LovableEmailTransactionalPreviewRoute
 }
 
@@ -146,6 +160,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceInviteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/workspace/submission-email': {
+      id: '/api/workspace/submission-email'
+      path: '/api/workspace/submission-email'
+      fullPath: '/api/workspace/submission-email'
+      preLoaderRoute: typeof ApiWorkspaceSubmissionEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/lovable/email/transactional/preview': {
       id: '/lovable/email/transactional/preview'
       path: '/lovable/email/transactional/preview'
@@ -162,6 +183,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminActionRoute: ApiAdminActionRoute,
   ApiAuthEmailHookRoute: ApiAuthEmailHookRoute,
   ApiWorkspaceInviteRoute: ApiWorkspaceInviteRoute,
+  ApiWorkspaceSubmissionEmailRoute: ApiWorkspaceSubmissionEmailRoute,
   LovableEmailTransactionalPreviewRoute: LovableEmailTransactionalPreviewRoute,
 }
 export const routeTree = rootRouteImport

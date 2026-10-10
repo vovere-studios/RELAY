@@ -1,7 +1,7 @@
 import { FieldLabel } from '../components/FieldLabel';
 import { formValidationMessage } from "../lib/form-validation";
 import { ActionButton, OutcomeMark, useActionFeedback } from "../components/ActionFeedback";
-import { IntakeWorkspaceShare } from "../components/CompanyExchange";
+
 import { LoadingIndicator } from '../components/ui';
 import { Select } from '../components/Select';
 import { useEffect, useState, type FormEvent } from "react";
@@ -23,6 +23,7 @@ const tokenFromURL = () =>
   new URLSearchParams(location.hash.slice(1)).get("token") || "";
 export function Intake() {
   const [token] = useState(tokenFromURL);
+  const navigate = useNavigate();
   const feedback = useActionFeedback();
   const [info, setInfo] = useState<IntakeInfo | null>(null);
   const [error, setError] = useState("");
@@ -31,8 +32,10 @@ export function Intake() {
   const [files, setFiles] = useState<File[]>([]);
   useEffect(() => {
     let active = true;
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),12000);
     void requireSupabase()
-      .functions.invoke("relay-intake", { body: { action: "info", token } })
+      .functions.invoke("relay-intake", { body: { action: "info", token },signal:controller.signal })
       .then(async (result) => {
         if (!active) return;
         if (result.error) {
@@ -43,12 +46,22 @@ export function Intake() {
             reason = json?.error || reason;
           } catch {}
           setError(reason);
-        } else setInfo(result.data);
-      });
+        } else {
+          setInfo(result.data);
+          if(new URLSearchParams(location.search).get('guest')!=='1') {
+            const {data}=await requireSupabase().auth.getUser();
+            if(active&&data.user) {
+              try { sessionStorage.setItem('relay-pending-intake',token); navigate('/cloud?return=intake',{replace:true}); }
+              catch { setError('Your browser cannot keep this request during sign-in. You can still send files below.'); }
+            }
+          }
+        }
+      }).catch(()=>{if(active)setError("The connection could not be opened. Please reload to try again.");}).finally(()=>clearTimeout(timeout));
     return () => {
       active = false;
+      clearTimeout(timeout);controller.abort();
     };
-  }, [token]);
+  }, [token,navigate]);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!info || busy || !feedback.begin("intake")) return;
@@ -106,9 +119,9 @@ export function Intake() {
               </>
             ) : (
               <>
-                Good information.
+                Your documents.
                 <br />
-                Starts here.
+                One connection.
               </>
             )}
           </h1>
@@ -152,11 +165,10 @@ export function Intake() {
               <span className="eyebrow">{info.company}</span>
               <h2>{info.title}</h2>
               <p>
-                Send certificates, declarations or company information. Link
-                expires {dateLabel(info.expires_at)}.
+                Link expires {dateLabel(info.expires_at)}.
               </p>
-              <IntakeWorkspaceShare token={token} onSent={()=>setSent(true)}/>
-              <div className="intake-upload-divider"><span>Or upload files directly</span></div>
+              <section className="intake-entry-options"><Link className="button button-primary" to="/login" onClick={()=>sessionStorage.setItem('relay-pending-intake',token)}>Choose from my workspace <ArrowUpRight size={17}/></Link><p>Already have RELAY? Sign in and send your saved documents.</p><Link className="intake-create-account" to="/signup" onClick={()=>sessionStorage.setItem('relay-pending-intake',token)}>New to RELAY? Keep your documents together <ArrowUpRight size={15}/></Link></section>
+              <div className="intake-upload-divider"><span>Send without an account</span></div>
               <form onSubmit={submit} onChange={()=>{feedback.reset("intake");setError("");}} onInvalidCapture={event=>{event.preventDefault();feedback.fail("intake");setError(formValidationMessage(event.currentTarget));}}>
                 <FieldLabel>
                   Your name
@@ -226,7 +238,7 @@ export function Intake() {
                 )}
                 <ActionButton type="submit" disabled={busy} label="Send documents" phase={feedback.phase("intake")} outcomeKey={feedback.version("intake")} pendingLabel="Sending documents…" successLabel="Documents delivered"/>
               </form>
-              <div className="intake-relay-invite"><strong>Not using RELAY yet?</strong><p>Keep your company documents in one place. Share them with connected partners whenever they need them.</p><Link to="/signup" onClick={()=>sessionStorage.setItem("relay-pending-intake",token)}>Create your account <ArrowUpRight size={14}/></Link></div>
+
               <p className="quiet-note">
                 By sending, you choose to share these files and your contact
                 details with {info.company}.
@@ -242,7 +254,7 @@ export function Intake() {
               </Link>
             </>
           ) : (
-            <p role="status">Opening your secure connection…</p>
+            <LoadingIndicator label="Opening your secure connection…"/>
           )}
         </section>
       </main>

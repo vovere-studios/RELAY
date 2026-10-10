@@ -28,3 +28,28 @@ This pass extends the authenticated workspace. It is not a claim that every plan
 - No production deployment or Git push was performed. VOVERE Studios was not modified.
 
 Screenshots: `inbox-desktop.png`, `inbox-mobile.png`.
+
+## Generated-link follow-up
+
+The result now expands from the generating control with a measured-height, damped animation, a subtle inner arrival, and a reduced-motion fallback. The layout groups the private URL with Copy and Preview; mobile stacks the controls. Invitation guidance uses email-specific wording. Desktop and 390px mobile presentation were checked in a temporary local React fixture with an inert `relay.example` test URL; the copied state was simulated only for visual QA. No production upload link or invitation was created. The temporary fixture was removed. Screenshots: `generated-link-desktop.png`, `generated-link-mobile.png`.
+
+
+## Authenticated upload-link response — 10 October
+
+Company Exchange migration activated in project aadbcovypefhlpsmoinn after explicit user approval. SQL fixtures in supabase/tests/company_exchange.sql passed and rolled back: routing, outsider denial, member read/admin sharing, document ownership, duplicate submission, expiration, revoked access and archived supplier isolation. Security advisors show no new WARN/ERROR for the exchange implementation; private tables intentionally deny direct access through revoked grants and RLS without policies. Existing leaked-password protection warning remains (passwordless auth).
+
+The public intake validates the link before authenticated redirect; login retains the fragment token in session storage. Dashboard return=intake now renders a dedicated document-selection view instead of redirecting back to the guest form. Direct guest upload uses guest=1 to avoid a redirect loop. Tokens stay out of URL query strings. Existing exchange APIs perform all authorization checks; no automatic sharing occurs. Link limits constrain selection. Missing link was verified in the authenticated browser (screenshot intake-response-missing-link.png). No real documents were shared or emails sent for UI QA.
+
+Company-owned uploads are prepared behind COMPANY_DOCUMENT_UPLOAD_ENABLED=false. The separate company-owned-documents migration is not applied and awaits explicit approval. CLI was unavailable; the migration filename was generated from the actual UTC clock. New upload keeps saving and sending separate, validates format signatures and cleans up orphan uploads on metadata failure. Requires production migration and tenant tests before activation.
+
+Automatic submission confirmation emails are still not implemented. Current dashboard notifications are workspace events written atomically by the exchange API. Guest confirmations, own-document upload activation and full successful browser round-trip still require follow-up; do not describe the entire response workflow as production-complete.
+
+
+Follow-up: submission-email server endpoint is now prepared. It verifies bearer identity, derives recipients through a service-only database function from an existing completed sharing receipt and checks sender administrator rights. Request bodies cannot specify email recipients. Stable hashed-recipient idempotency keys protect retries. UI distinguishes committed document sharing from email failure and offers a separate email retry. Requires the second migration, LOVABLE_API_KEY and server-only RELAY_SUPABASE_SECRET_KEY in Lovable before activation. Guest email delivery is not implemented yet. A new company_owned_exchange.sql fixture suite is prepared but not run because that migration is awaiting approval.
+
+
+## Own company files activated and uploaded
+
+User explicitly approved activation and a harmless PDF upload, provided there are no purchases or plan changes. Applied relay_company_owned_documents to external RELAY project. company_owned_exchange.sql passed and rolled all fixtures back. Delivery-address RPC privileges verified: authenticated=false, anon=false, service_role=true. Enabled company-document upload gate; added My company option to the actual document dialog, without requiring a Supplier record.
+
+Uploaded RELAY-test-only.pdf through the authenticated UI into VOVERE Studios as Company information. Database verification: supplier_id is NULL, Storage object exists, document_shares count is zero. The harmless file is retained in the workspace as requested; it was not shared with another company. No purchase, subscription or plan change occurred. Production build passed. Automatic confirmation-mail delivery remains dependent on server secret setup; no email delivery is claimed.
