@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as ApiAdminActionRouteImport } from './routes/api/admin/action'
 import { Route as ApiAuthEmailHookRouteImport } from './routes/api/auth/email-hook'
+import { Route as ApiIntakeConfirmationRouteImport } from './routes/api/intake/confirmation'
 import { Route as ApiWorkspaceInviteRouteImport } from './routes/api/workspace/invite'
 import { Route as ApiWorkspaceSubmissionEmailRouteImport } from './routes/api/workspace/submission-email'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
@@ -35,6 +36,11 @@ const ApiAdminActionRoute = ApiAdminActionRouteImport.update({
 const ApiAuthEmailHookRoute = ApiAuthEmailHookRouteImport.update({
   id: '/api/auth/email-hook',
   path: '/api/auth/email-hook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiIntakeConfirmationRoute = ApiIntakeConfirmationRouteImport.update({
+  id: '/api/intake/confirmation',
+  path: '/api/intake/confirmation',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiWorkspaceInviteRoute = ApiWorkspaceInviteRouteImport.update({
@@ -60,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/$': typeof SplatRoute
   '/api/admin/action': typeof ApiAdminActionRoute
   '/api/auth/email-hook': typeof ApiAuthEmailHookRoute
+  '/api/intake/confirmation': typeof ApiIntakeConfirmationRoute
   '/api/workspace/invite': typeof ApiWorkspaceInviteRoute
   '/api/workspace/submission-email': typeof ApiWorkspaceSubmissionEmailRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
@@ -69,6 +76,7 @@ export interface FileRoutesByTo {
   '/$': typeof SplatRoute
   '/api/admin/action': typeof ApiAdminActionRoute
   '/api/auth/email-hook': typeof ApiAuthEmailHookRoute
+  '/api/intake/confirmation': typeof ApiIntakeConfirmationRoute
   '/api/workspace/invite': typeof ApiWorkspaceInviteRoute
   '/api/workspace/submission-email': typeof ApiWorkspaceSubmissionEmailRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
@@ -79,6 +87,7 @@ export interface FileRoutesById {
   '/$': typeof SplatRoute
   '/api/admin/action': typeof ApiAdminActionRoute
   '/api/auth/email-hook': typeof ApiAuthEmailHookRoute
+  '/api/intake/confirmation': typeof ApiIntakeConfirmationRoute
   '/api/workspace/invite': typeof ApiWorkspaceInviteRoute
   '/api/workspace/submission-email': typeof ApiWorkspaceSubmissionEmailRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
@@ -90,6 +99,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/api/admin/action'
     | '/api/auth/email-hook'
+    | '/api/intake/confirmation'
     | '/api/workspace/invite'
     | '/api/workspace/submission-email'
     | '/lovable/email/transactional/preview'
@@ -99,6 +109,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/api/admin/action'
     | '/api/auth/email-hook'
+    | '/api/intake/confirmation'
     | '/api/workspace/invite'
     | '/api/workspace/submission-email'
     | '/lovable/email/transactional/preview'
@@ -108,6 +119,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/api/admin/action'
     | '/api/auth/email-hook'
+    | '/api/intake/confirmation'
     | '/api/workspace/invite'
     | '/api/workspace/submission-email'
     | '/lovable/email/transactional/preview'
@@ -118,6 +130,7 @@ export interface RootRouteChildren {
   SplatRoute: typeof SplatRoute
   ApiAdminActionRoute: typeof ApiAdminActionRoute
   ApiAuthEmailHookRoute: typeof ApiAuthEmailHookRoute
+  ApiIntakeConfirmationRoute: typeof ApiIntakeConfirmationRoute
   ApiWorkspaceInviteRoute: typeof ApiWorkspaceInviteRoute
   ApiWorkspaceSubmissionEmailRoute: typeof ApiWorkspaceSubmissionEmailRoute
   LovableEmailTransactionalPreviewRoute: typeof LovableEmailTransactionalPreviewRoute
@@ -153,6 +166,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthEmailHookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/intake/confirmation': {
+      id: '/api/intake/confirmation'
+      path: '/api/intake/confirmation'
+      fullPath: '/api/intake/confirmation'
+      preLoaderRoute: typeof ApiIntakeConfirmationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/workspace/invite': {
       id: '/api/workspace/invite'
       path: '/api/workspace/invite'
@@ -182,6 +202,7 @@ const rootRouteChildren: RootRouteChildren = {
   SplatRoute: SplatRoute,
   ApiAdminActionRoute: ApiAdminActionRoute,
   ApiAuthEmailHookRoute: ApiAuthEmailHookRoute,
+  ApiIntakeConfirmationRoute: ApiIntakeConfirmationRoute,
   ApiWorkspaceInviteRoute: ApiWorkspaceInviteRoute,
   ApiWorkspaceSubmissionEmailRoute: ApiWorkspaceSubmissionEmailRoute,
   LovableEmailTransactionalPreviewRoute: LovableEmailTransactionalPreviewRoute,

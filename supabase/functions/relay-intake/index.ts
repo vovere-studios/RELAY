@@ -47,7 +47,7 @@ Deno.serve(async req => {
   }
   const finished=await client.rpc('relay_intake_api',{action:'finish',payload:{reservation_id:reservation,name,email,files:records}});
   if(finished.error)throw new Error('record');
-  return respond(finished.data);
+  return respond({...finished.data,document_ids:records.map(record=>record.id),reservation_id:reservation});
  } catch {
   if(paths.length)await client.storage.from('relay-documents').remove(paths);
   if(reservation)await client.rpc('relay_intake_api',{action:'cancel',payload:{reservation_id:reservation}});

@@ -1,3 +1,4 @@
+import { IntakeReceipt } from '../components/IntakeReceipt';
 import { FieldLabel } from '../components/FieldLabel';
 import { formValidationMessage } from "../lib/form-validation";
 import { ActionButton, OutcomeMark, useActionFeedback } from "../components/ActionFeedback";
@@ -30,6 +31,14 @@ export function Intake() {
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  const [receipt,setReceipt]=useState<string[]>([]);
+  const [receiptId,setReceiptId]=useState('');
+  const [emailStatus,setEmailStatus]=useState<'idle'|'pending'|'sent'|'failed'>('idle');
+  async function confirmEmail(ids=receipt,submissionId=receiptId) {
+    if(!ids.length||!submissionId){setEmailStatus('failed');return;}
+    setEmailStatus('pending');
+    try{const response=await fetch('/api/intake/confirmation',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({token,document_ids:ids,reservation_id:submissionId})});const result=await response.json();setEmailStatus(response.ok&&result.emailStatus==='sent'?'sent':'failed');}catch{setEmailStatus('failed');}
+  }
   useEffect(() => {
     let active = true;
     const controller=new AbortController();
@@ -96,6 +105,9 @@ export function Intake() {
         throw new Error(reason);
       }
       if(sessionStorage.getItem("relay-pending-intake")===token)sessionStorage.removeItem("relay-pending-intake");
+      const ids=Array.isArray(result.data?.document_ids)?result.data.document_ids as string[]:[];
+      setReceipt(ids);setReceiptId(result.data?.reservation_id||'');
+      void confirmEmail(ids,result.data?.reservation_id||'');
       feedback.succeed("intake",()=>setSent(true));
     } catch (error) {
       feedback.fail("intake");
@@ -141,24 +153,7 @@ export function Intake() {
         <section className="access-panel intake-panel" data-delivered={sent}>
           {sent ? (
             <>
-              <div className="intake-delivered-mark"><OutcomeMark tone="success"/></div>
-              <h2>Your files have arrived.</h2>
-              <p>
-                Your documents are available to {info?.company} and are awaiting review.
-              </p>
-              <div className="access-note">
-                <strong>Your next connection can be simpler.</strong>
-                <span>
-                  Create your Relay account to keep your documents together and
-                  share them with registered companies from your workspace.
-                </span>
-              </div>
-              <Link className="button button-primary" to="/signup">
-                Create your account <ArrowUpRight size={17} />
-              </Link>
-              <Link className="access-secondary" to="/">
-                Discover Relay
-              </Link>
+              <IntakeReceipt company={info?.company||'the receiving company'} emailStatus={emailStatus} onRetry={receipt.length?()=>void confirmEmail():undefined}/>
             </>
           ) : info ? (
             <>

@@ -858,3 +858,18 @@
 .response-new-document { margin-top:24px; }
 .response-upload-form { display:grid; gap:20px; padding:24px 0; }
 .response-upload-form > label { display:grid; gap:10px; }
+
+/* Match main.public-main specificity so the general main rule cannot erase intake spacing. */
+main.public-main.intake-main { width:100%; max-width:1280px; padding:clamp(64px,8vw,112px) 36px 96px; margin-inline:auto; gap:clamp(40px,6vw,88px); grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+.intake-main > section { min-width:0; }
+.intake-panel[data-delivered="true"] { display:flex; flex-direction:column; align-items:stretch; gap:24px; padding:clamp(28px,4vw,44px); }
+.intake-panel[data-delivered="true"] > :is(h2,p,.access-note) { margin:0; }
+.intake-panel[data-delivered="true"] .intake-delivered-mark { margin:0 0 8px; }
+.intake-panel[data-delivered="true"] .access-note { display:grid; gap:12px; padding-top:24px; border-top:1px solid var(--border); }
+.intake-panel[data-delivered="true"] > .button { align-self:flex-start; max-width:100%; }
+.intake-panel[data-delivered="true"] > .access-secondary { margin:0; align-self:flex-start; }
+.intake-email-status { display:grid; gap:10px; font-size:13px; color:var(--muted); line-height:1.6; }
+.intake-email-status p { margin:0; }
+.intake-email-status .button { justify-self:start; }
+@media(max-width:900px) { main.public-main.intake-main { padding:64px 24px 72px; gap:40px; } }
+@media(max-width:640px) { main.public-main.intake-main { grid-template-columns:minmax(0,1fr); padding:48px 20px 64px; gap:32px; }.intake-panel[data-delivered="true"] { gap:22px; padding:28px 22px; }.intake-panel[data-delivered="true"] > .button { width:100%; } }

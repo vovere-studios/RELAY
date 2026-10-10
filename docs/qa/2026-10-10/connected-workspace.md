@@ -53,3 +53,14 @@ Follow-up: submission-email server endpoint is now prepared. It verifies bearer 
 User explicitly approved activation and a harmless PDF upload, provided there are no purchases or plan changes. Applied relay_company_owned_documents to external RELAY project. company_owned_exchange.sql passed and rolled all fixtures back. Delivery-address RPC privileges verified: authenticated=false, anon=false, service_role=true. Enabled company-document upload gate; added My company option to the actual document dialog, without requiring a Supplier record.
 
 Uploaded RELAY-test-only.pdf through the authenticated UI into VOVERE Studios as Company information. Database verification: supplier_id is NULL, Storage object exists, document_shares count is zero. The harmless file is retained in the workspace as requested; it was not shared with another company. No purchase, subscription or plan change occurred. Production build passed. Automatic confirmation-mail delivery remains dependent on server secret setup; no email delivery is claimed.
+
+
+## Guest upload confirmation and receipt spacing
+
+Root causes: guest uploads never called a confirmation endpoint; main.public-main had higher specificity than .intake-main and erased vertical padding. Fixed intake-specific main spacing plus explicit success-card gaps, signup-copy spacing, and footer separation. Extracted IntakeReceipt for reuse and visual QA. Desktop at CSS 1280px: header-to-card gap 102px, card-to-footer gap 96px, no horizontal overflow. Mobile at CSS 390px: card-to-footer gap 64px, no horizontal overflow. Screenshots use clearly fictional Example Company data and a simulated sent-mail state; they do not demonstrate real delivery. Temporary QA HTML/TSX removed.
+
+Guest confirmation endpoint accepts the secret link token, completed reservation ID and 1-5 document IDs. It verifies the reservation's link, completed state, count, stored document ownership, submission timestamp window and common stored contact before deriving receiving owner/admin emails. Addresses are not accepted from the request. Repeated attempts use the reservation ID and recipient hash as stable provider idempotency keys. Successful file delivery stays committed if mail fails; UI reports failure and offers a separate retry.
+
+Supabase relay-intake deployed as version 4, preserving existing verify_jwt=false capability-link validation. Only added document_ids/reservation_id to the successful response; previous deployed source compared before update. Existing clients remain compatible. No schema migration added. Real emails were not sent during QA. Actual inbox delivery requires publishing the frontend/server update and a new approved submission.
+
+Mail SDK tests passed: sender/requester routing, HTML escaping, guest copy (no false claim of stored originals), retry idempotency, rejected provider response and network failure. Production build and invalid-request endpoint checks recorded separately.
