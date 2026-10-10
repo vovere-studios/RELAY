@@ -43,7 +43,7 @@ export const dateLabel = (date: string) =>
     day: "numeric",
     month: "short",
     year: "numeric",
-  }).format(new Date(date));
+  }).format(new Date(date.length === 10 ? `${date}T12:00:00` : date));
 export function privateLink(path: "submit" | "join", token: string) {
   return `${location.origin}/${path}#token=${encodeURIComponent(token)}`;
 }

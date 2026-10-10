@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as ApiAdminActionRouteImport } from './routes/api/admin/action'
 import { Route as ApiAuthEmailHookRouteImport } from './routes/api/auth/email-hook'
+import { Route as ApiWorkspaceInviteRouteImport } from './routes/api/workspace/invite'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 
 const IndexRoute = IndexRouteImport.update({
@@ -35,6 +36,11 @@ const ApiAuthEmailHookRoute = ApiAuthEmailHookRouteImport.update({
   path: '/api/auth/email-hook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWorkspaceInviteRoute = ApiWorkspaceInviteRouteImport.update({
+  id: '/api/workspace/invite',
+  path: '/api/workspace/invite',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LovableEmailTransactionalPreviewRoute =
   LovableEmailTransactionalPreviewRouteImport.update({
     id: '/lovable/email/transactional/preview',
@@ -47,6 +53,7 @@ export interface FileRoutesByFullPath {
   '/$': typeof SplatRoute
   '/api/admin/action': typeof ApiAdminActionRoute
   '/api/auth/email-hook': typeof ApiAuthEmailHookRoute
+  '/api/workspace/invite': typeof ApiWorkspaceInviteRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
 }
 export interface FileRoutesByTo {
@@ -54,6 +61,7 @@ export interface FileRoutesByTo {
   '/$': typeof SplatRoute
   '/api/admin/action': typeof ApiAdminActionRoute
   '/api/auth/email-hook': typeof ApiAuthEmailHookRoute
+  '/api/workspace/invite': typeof ApiWorkspaceInviteRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
 }
 export interface FileRoutesById {
@@ -62,6 +70,7 @@ export interface FileRoutesById {
   '/$': typeof SplatRoute
   '/api/admin/action': typeof ApiAdminActionRoute
   '/api/auth/email-hook': typeof ApiAuthEmailHookRoute
+  '/api/workspace/invite': typeof ApiWorkspaceInviteRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
 }
 export interface FileRouteTypes {
@@ -71,6 +80,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/api/admin/action'
     | '/api/auth/email-hook'
+    | '/api/workspace/invite'
     | '/lovable/email/transactional/preview'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -78,6 +88,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/api/admin/action'
     | '/api/auth/email-hook'
+    | '/api/workspace/invite'
     | '/lovable/email/transactional/preview'
   id:
     | '__root__'
@@ -85,6 +96,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/api/admin/action'
     | '/api/auth/email-hook'
+    | '/api/workspace/invite'
     | '/lovable/email/transactional/preview'
   fileRoutesById: FileRoutesById
 }
@@ -93,6 +105,7 @@ export interface RootRouteChildren {
   SplatRoute: typeof SplatRoute
   ApiAdminActionRoute: typeof ApiAdminActionRoute
   ApiAuthEmailHookRoute: typeof ApiAuthEmailHookRoute
+  ApiWorkspaceInviteRoute: typeof ApiWorkspaceInviteRoute
   LovableEmailTransactionalPreviewRoute: typeof LovableEmailTransactionalPreviewRoute
 }
 
@@ -126,6 +139,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthEmailHookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/workspace/invite': {
+      id: '/api/workspace/invite'
+      path: '/api/workspace/invite'
+      fullPath: '/api/workspace/invite'
+      preLoaderRoute: typeof ApiWorkspaceInviteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/lovable/email/transactional/preview': {
       id: '/lovable/email/transactional/preview'
       path: '/lovable/email/transactional/preview'
@@ -141,6 +161,7 @@ const rootRouteChildren: RootRouteChildren = {
   SplatRoute: SplatRoute,
   ApiAdminActionRoute: ApiAdminActionRoute,
   ApiAuthEmailHookRoute: ApiAuthEmailHookRoute,
+  ApiWorkspaceInviteRoute: ApiWorkspaceInviteRoute,
   LovableEmailTransactionalPreviewRoute: LovableEmailTransactionalPreviewRoute,
 }
 export const routeTree = rootRouteImport

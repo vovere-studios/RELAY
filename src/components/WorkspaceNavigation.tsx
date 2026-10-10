@@ -34,7 +34,7 @@ export function WorkspaceNavigation({
     </div>}>
     <div className="navigation-company">{companySwitcher}</div>
     <nav aria-label="Mobile company workspace navigation">
-      {[{label:"Workspace",items:destinations.slice(0,6)},{label:"Your company",items:destinations.slice(6)}].map(group =>
+      {[{label:"Workspace",items:destinations.filter(item=>!["activity","team","settings"].includes(item.id))},{label:"Your company",items:destinations.filter(item=>["activity","team","settings"].includes(item.id))}].map(group =>
         <div className="navigation-group" key={group.label}>
           <p className="navigation-group-label">{group.label}</p>
           {group.items.map(({id,label,icon:Icon}) => <Link key={id}

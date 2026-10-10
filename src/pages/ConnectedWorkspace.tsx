@@ -1,3 +1,9 @@
+import { SavedSupplierSearches } from '../components/SavedSupplierSearches';
+import { RequestDetails } from '../components/RequestDetails';
+import { ProductDetails } from '../components/ProductDetails';
+import { ConnectedSearch } from '../components/ConnectedSearch';
+import { WorkspaceInbox } from '../components/WorkspaceInbox';
+import { DocumentPreview } from '../components/DocumentPreview';
 import { FieldLabel } from '../components/FieldLabel';
 import { RefreshControl } from '../components/RefreshControl';
 import { AppearancePicker } from '../components/AppearancePicker';
@@ -32,6 +38,7 @@ import {
   Check,
   ShieldCheck,
   Bell,
+  Inbox,
   ChevronDown,
   Package,
   Activity,
@@ -99,6 +106,7 @@ type Data = {
 };
 const sections = [
   { id: "overview", label: "Overview", icon: LayoutGrid },
+  { id: "inbox", label: "Inbox", icon: Inbox },
   { id: "suppliers", label: "Suppliers", icon: Building2 },
   { id: "documents", label: "Documents", icon: Files },
   { id: "requests", label: "Requests", icon: ArrowUpRight },
@@ -109,6 +117,7 @@ const sections = [
   { id: "settings", label: "Settings", icon: Settings },
 ];
 const titles: Record<string, [string, string]> = {
+  inbox: ["Your next steps.", "Requests, document reviews and deadlines. One place to move forward."],
   overview: [
     "Your network. In focus.",
     "Company information, evidence and relationships. Connected.",
@@ -172,9 +181,10 @@ export function ConnectedWorkspace() {
   const [settingsDirty, setSettingsDirty] = useState(false);
   const [supplierDirty,setSupplierDirty] = useState(false);
   const [profileDirty,setProfileDirty] = useState(false);
+  const [productDirty,setProductDirty] = useState(false);
   const [detailPage, setDetailPage] = useState(0);
   const [lookupQuery, setLookupQuery] = useState("");
-  const [searchTerms, setSearchTerms] = useState({query:"",lookup:""});
+  const [searchTerms, setSearchTerms] = useState({query:params.get("q") || "",lookup:""});
   const [refreshing, setRefreshing] = useState(false);
   const [trashOpen,setTrashOpen] = useState(false);
   const [removeSupplier,setRemoveSupplier] = useState<{id:string;legal_name:string} | undefined>();
@@ -190,17 +200,17 @@ export function ConnectedWorkspace() {
   const [error, setError] = useState("");
   const [actionStatus,setActionStatus] = useState("");
   const [actionErrors,setActionErrors] = useState<Record<string,string>>({});
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(params.get("q") || "");
   const [menu, setMenu] = useState(false);
   const [leaveIntent, setLeaveIntent] = useState<{ run: () => void } | null>(null);
   const navigationAccepted = useRef(false);
   const blocker = useBlocker(useCallback<BlockerFunction>(({currentLocation,nextLocation}) =>
-    !!currentUser.current && !navigationAccepted.current && (settingsDirty || supplierDirty || profileDirty) &&
+    !!currentUser.current && !navigationAccepted.current && (settingsDirty || supplierDirty || profileDirty || productDirty) &&
     (currentLocation.pathname !== nextLocation.pathname || currentLocation.search !== nextLocation.search),
-  [settingsDirty,supplierDirty,profileDirty]));
-  useEffect(()=>{if(!settingsDirty&&!supplierDirty&&!profileDirty)navigationAccepted.current=false;},[settingsDirty,supplierDirty,profileDirty]);
+  [settingsDirty,supplierDirty,profileDirty,productDirty]));
+  useEffect(()=>{if(!settingsDirty&&!supplierDirty&&!profileDirty&&!productDirty)navigationAccepted.current=false;},[settingsDirty,supplierDirty,profileDirty,productDirty]);
   function keepEditing(){setLeaveIntent(null);if(blocker.state==="blocked")blocker.reset();}
-  function leaveWithoutSaving(){const intent=leaveIntent;navigationAccepted.current=true;setLeaveIntent(null);setSupplierDirty(false);setSettingsDirty(false);setProfileDirty(false);if(blocker.state==="blocked")blocker.proceed();else intent?.run();}
+  function leaveWithoutSaving(){const intent=leaveIntent;navigationAccepted.current=true;setLeaveIntent(null);setSupplierDirty(false);setSettingsDirty(false);setProfileDirty(false);setProductDirty(false);if(blocker.state==="blocked")blocker.proceed();else intent?.run();}
 
   const [confirmation, setConfirmation] = useState<{id: string; title: string; description: string; label: string; cancelLabel?: string; successLabel?: string; run: () => Promise<unknown>} | null>(null);
   const [dialog, setDialog] = useState<
@@ -217,13 +227,14 @@ export function ConnectedWorkspace() {
   function setSelected(id: string | null, tab = "Company") {
     const next = new URLSearchParams(params);
     if(data?.org.id)next.set("org",data.org.id);
-    if(id) { next.set("supplier",id); next.set("view","suppliers"); next.set("tab",tab); next.delete("page"); } else {next.delete("supplier");next.delete("tab");}
+    if(id) { next.set("supplier",id); next.set("view","suppliers"); next.set("tab",tab); } else {next.delete("supplier");next.delete("tab");}
     setParams(next);
     setSupplierEditing(false);
   }
   const [supplierEditing,setSupplierEditing] = useState(false);
   const [shareIds,setShareIds] = useState<string[]>([]);
   const [generated, setGenerated] = useState<string>("");
+  const [inviteDelivery,setInviteDelivery] = useState("");
   const [directory, setDirectory] = useState<Row<"company_directory">[]>([]);
   const [directoryQuery, setDirectoryQuery] = useState("");
   const [directoryLoading, setDirectoryLoading] = useState(false);
@@ -232,6 +243,7 @@ export function ConnectedWorkspace() {
   const generation = useRef(0);
   const loadedOrg = useRef<string | null>(null);
   const manager = !!data && data.role !== "member";
+  useEffect(()=>{setShareIds([]);},[data?.org.id]);
   useEffect(()=>{
     if(!data)return;
     try{const value=JSON.parse(localStorage.getItem(`relay-overview-${data.user.id}-${data.org.id}`)||"null");setWidgets(Array.isArray(value)?value.filter(item=>["network","health","attention","expiry","activity","privacy"].includes(item)):["network","health","attention","expiry","activity","privacy"]);}catch{setWidgets(["network","health","attention","expiry","activity","privacy"]);}
@@ -267,7 +279,7 @@ export function ConnectedWorkspace() {
         user = auth.data.user;
         currentUser.current = user;
       }
-      const payload = { organization_id:orgParam, view, page, query:searchTerms.query, lookup:searchTerms.lookup, selected, detail_page:detailPage, detail_tab:detailTab, dialog };
+      const payload = { organization_id:orgParam, view: view === "inbox" ? "overview" : view, page, query:searchTerms.query, lookup:searchTerms.lookup, selected, detail_page:detailPage, detail_tab:detailTab, dialog };
       let result = checkResult(await client.rpc("relay_workspace_snapshot", {payload}).abortSignal(controller.signal)).data as unknown as Omit<Data,"user"|"view"> & {needs_workspace?:boolean};
       if (result.needs_workspace) {
         checkResult(await client.rpc("create_workspace", {company_name:String(user.user_metadata.company_name || "My company"),full_name:String(user.user_metadata.full_name || "")}));
@@ -303,12 +315,12 @@ export function ConnectedWorkspace() {
   },[query,lookupQuery]);
   useEffect(() => { setDetailPage(0); },[selected,detailTab]);
   useEffect(() => {
-    if (!settingsDirty && !supplierDirty && !profileDirty) return;
+    if (!settingsDirty && !supplierDirty && !profileDirty && !productDirty) return;
     const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue="";};
     window.addEventListener("beforeunload",warn);return()=>window.removeEventListener("beforeunload",warn);
-  },[settingsDirty,supplierDirty,profileDirty]);
+  },[settingsDirty,supplierDirty,profileDirty,productDirty]);
   useEffect(() => {
-    setQuery("");
+    setQuery(params.get("q") || "");
     setMenu(false);
     setDialog(null);
     setCustomize(false);
@@ -316,6 +328,7 @@ export function ConnectedWorkspace() {
     setConfirmation(null);
     setLeaveIntent(null);
   }, [view, orgParam]);
+  useEffect(()=>{setQuery(params.get("q") || "");},[params.get("q")]);
   useEffect(() => {
     if (view !== "directory" && dialog !== "share") return;
     let active = true;
@@ -346,7 +359,7 @@ export function ConnectedWorkspace() {
     return () => desktop.removeEventListener("change", resize);
   }, []);
   function depart(run: () => void) {
-    if (settingsDirty || supplierDirty || profileDirty) setLeaveIntent({ run });
+    if (settingsDirty || supplierDirty || profileDirty || productDirty) setLeaveIntent({ run });
     else run();
   }
   function switchCompany(id: string) {
@@ -389,8 +402,9 @@ export function ConnectedWorkspace() {
     feedback.reset("dialog");
     setError("");
     setGenerated("");
+    setInviteDelivery("");
     setLookupQuery("");
-    setShareIds([]);
+    if(next!=="share")setShareIds([]);
     setDialog(next);
   }
   async function copy(url: string) {
@@ -513,11 +527,14 @@ export function ConnectedWorkspace() {
             }),
         );
       if (dialog === "invite") {
-        const result = await workspaceAction<{ token: string }>("invite", {
-          organization_id: data.org.id,
-          email: field(form, "email"),
-          role: field(form, "role"),
-        });
+        const session=await client.auth.getSession();
+        if(!session.data.session)throw new Error("Sign in again to invite your team.");
+        const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),20000);
+        let result:{token:string;emailStatus:string};
+        try{const response=await fetch("/api/workspace/invite",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${session.data.session.access_token}`},body:JSON.stringify({organization_id:data.org.id,email:field(form,"email"),role:field(form,"role")}),signal:controller.signal});
+          const body=await response.json();if(!response.ok)throw new Error(body.error||"The invitation could not be confirmed. Check Team before trying again.");result=body;
+        }finally{clearTimeout(timeout);}
+        setInviteDelivery(result.emailStatus==="sent"?"Invitation email submitted for delivery. The private link is available below too.":result.emailStatus==="suppressed"?"Email delivery is suppressed for this address. You can share the private link below.":result.emailStatus==="failed"?"The invitation is ready, but email delivery failed. Share the private link below.":"The invitation is ready. Email delivery is not configured here; share the private link below.");
         feedback.succeed("dialog", () => setGenerated(privateLink("join", result.token)));
         void load();
 
@@ -529,7 +546,7 @@ export function ConnectedWorkspace() {
           recipient_id: field(form, "recipient"),
           document_ids: shareIds,
         });
-      feedback.succeed("dialog", () => setDialog(current => current === submittedDialog ? null : current));
+      feedback.succeed("dialog", () => {if(submittedDialog==="share")setShareIds([]);setDialog(current => current === submittedDialog ? null : current);});
       void load();
     } catch (error) {
       feedback.fail("dialog");
@@ -600,7 +617,7 @@ export function ConnectedWorkspace() {
   const generatedCard = generated && (
     <div className="generated-link">
       <strong>Your private link</strong>
-      <p>Copy it now. Relay stores only its protected fingerprint.</p>
+      <p>{dialog==="invite"&&inviteDelivery?inviteDelivery:"Copy it now. Relay stores only its protected fingerprint."}</p>
       <div>
         <Input
           readOnly
@@ -709,7 +726,7 @@ export function ConnectedWorkspace() {
                       .map((doc) => (
                         <div className="list-row" key={doc.id}>
                           <div className="row-copy">
-                            <strong>{doc.name}</strong>
+                            <button type="button" className="document-open" onClick={()=>{const next=new URLSearchParams(params);next.set("document",doc.id);setParams(next);}}>{doc.name}</button>
                             <small>
                               {doc.submitted_by_name
                                 ? `Submitted by ${doc.submitted_by_name}`
@@ -854,7 +871,7 @@ export function ConnectedWorkspace() {
   return (
     <div className="app connected-app" onClickCapture={event=>{
       const link=event.target instanceof Element?event.target.closest<HTMLAnchorElement>("a[href]"):null;
-      if((!settingsDirty && !supplierDirty && !profileDirty) || !link || link.getAttribute("href")?.startsWith("#") || link.target === "_blank" || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if((!settingsDirty && !supplierDirty && !profileDirty && !productDirty) || !link || link.getAttribute("href")?.startsWith("#") || link.target === "_blank" || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const destination = new URL(link.href, location.href);
       if (destination.href === location.href) return;
       event.preventDefault(); event.stopPropagation();
@@ -949,13 +966,14 @@ export function ConnectedWorkspace() {
             </span>
           </div>
           <div className="topbar-right">
+            {data && <ConnectedSearch organizationId={data.org.id}/>}
             <button className="icon-button" aria-label={`Switch to ${resolved === "light" ? "dark" : "light"} mode`} onClick={()=>setPreference(resolved==="light"?"dark":"light")}>
               {resolved==="light"?<Moon size={18}/>:<Sun size={18}/>}
             </button>
             <button
               className="icon-button"
               aria-label="Workspace updates"
-              onClick={() => openDialog("notifications")}
+              onClick={() => depart(()=>setParams({view:"inbox",org:data?.org.id || orgParam || ""}))}
             >
               <Bell size={18} />
             </button>
@@ -967,7 +985,7 @@ export function ConnectedWorkspace() {
         <main id="main" tabIndex={-1}>
           <span className="sr-only" role="status">{actionStatus}</span>
           {selected ? <header className="supplier-page-heading">
-            <Link className="supplier-back" to={`/cloud?view=suppliers&org=${data?.org.id || orgParam || ""}`}><ChevronRight size={15}/>All suppliers</Link>
+            <Link className="supplier-back" to={`/cloud?${(()=>{const next=new URLSearchParams(params);next.delete("supplier");next.delete("tab");return next.toString();})()}`}><ChevronRight size={15}/>All suppliers</Link>
             <div className="supplier-page-identity"><span className="supplier-page-monogram">{supplier?.legal_name[0] || "·"}</span><div><p className="eyebrow">{supplier?.source_organization_id ? "CONNECTED ON RELAY" : "SUPPLIER CONNECTION"}</p><h1>{supplier?.legal_name || "Supplier workspace"}</h1><p>{[supplier?.country,supplier?.category].filter(Boolean).join(" · ")}</p></div></div>
             <div className="supplier-page-actions">{manager && <><Button variant="secondary" onClick={()=>openDialog("document")}><ActionIcon kind="upload"/>Upload document</Button><Button onClick={()=>openDialog("request")}><ActionIcon kind="request"/>Request documents</Button></>}</div>
           </header> : (
@@ -1060,66 +1078,9 @@ export function ConnectedWorkspace() {
                       </div>
                     ))}
                   </div>}
+                  {widgets.includes("attention") && <WorkspaceInbox key={data.org.id} compact organizationId={data.org.id} manager={manager} events={data.events} revision={generation.current}/>}
                   <WorkspaceInsights organizationId={data.org.id} suppliers={data.metrics.suppliers} complete={data.metrics.complete} health={widgets.includes("health")} expiry={widgets.includes("expiry")}/>
-                  <div className={`connected-overview-grid ${!widgets.includes("attention") || !widgets.includes("activity") ? "is-single" : ""}`}>
-                    {widgets.includes("attention") && <section className="connected-panel">
-                      <div className="connected-panel-heading">
-                        <h2>What needs your attention.</h2>
-                        <Link to={`/cloud?view=suppliers&org=${data.org.id}`}>
-                          All connections <ArrowUpRight size={15} />
-                        </Link>
-                      </div>
-                      {data.health
-                        .filter((row) => row.status !== "complete")
-                        .slice(0, 5)
-                        .map((row) => {
-                          const company = data.suppliers.find(
-                            (company) => company.id === row.supplier_id,
-                          );
-                          return (
-                            <button
-                              className="connected-attention"
-                              key={row.id}
-                              onClick={() => {
-                                setSelected(row.supplier_id,"Requirements");
-                              }}
-                            >
-                              <span className="company-monogram">
-                                {company?.legal_name[0]}
-                              </span>
-                              <span>
-                                <strong>{company?.legal_name}</strong>
-                                <small>
-                                  {row.missing_requirements} requirements
-                                  missing
-                                </small>
-                              </span>
-                              <Status status={healthStatus(row)} />
-                              <ChevronRight className="attention-chevron" size={17} />
-                            </button>
-                          );
-                        })}
-                      {!!data.metrics.suppliers && data.metrics.complete === data.metrics.suppliers && (
-                          <p className="quiet-note">
-                            Every connection is complete. Your network is up to
-                            date.
-                          </p>
-                        )}
-                      {!data.metrics.suppliers && (
-                        <EmptyState
-                          title="Your first connection."
-                          description="Add a supplier or discover a registered company to begin."
-                          action={
-                            <Link
-                              className="button button-secondary"
-                              to={`/cloud?view=directory&org=${data.org.id}`}
-                            >
-                              Discover companies <ArrowUpRight size={15} />
-                            </Link>
-                          }
-                        />
-                      )}
-                    </section>}
+                  <div className="connected-overview-grid is-single">
                     {widgets.includes("activity") && <section className="connected-panel">
                       <h2>Moving, together.</h2>
                       {data.events.length ? (
@@ -1158,6 +1119,7 @@ export function ConnectedWorkspace() {
                 </>
               )}
               {refreshing && <div className="workspace-refresh-status"><LoadingIndicator compact label="Updating workspace…"/></div>}
+              {view === "inbox" && <WorkspaceInbox key={data.org.id} organizationId={data.org.id} manager={manager} events={data.events} revision={generation.current}/>}
               {view === "suppliers" && (
                 <>
                   <div className="connected-search">
@@ -1166,11 +1128,12 @@ export function ConnectedWorkspace() {
                       placeholder="Search company, country or category…"
                       aria-label="Search connected suppliers"
                       value={query}
-                      onChange={(event) => {setQuery(event.target.value);setParams(previous=>{const next=new URLSearchParams(previous);next.delete("page");return next;},{replace:true});}}
+                      onChange={(event) => {setQuery(event.target.value);setParams(previous=>{const next=new URLSearchParams(previous);next.delete("page");if(event.target.value)next.set("q",event.target.value);else next.delete("q");return next;},{replace:true});}}
                     />
                     <span>{shownSuppliers.length} in view</span>
                     {manager && <Button variant="ghost" onClick={()=>{setRemoveSupplier(undefined);setTrashOpen(true);}}><Trash2 size={16}/>Trash</Button>}
                   </div>
+                  <SavedSupplierSearches userId={data.user.id} organizationId={data.org.id} query={query} onSelect={value=>{setQuery(value);setParams(previous=>{const next=new URLSearchParams(previous);next.delete("page");next.set("q",value);return next;});}}/>
                   <div className="connected-panel connected-list">
                     {shownSuppliers.map((company) => {
                       const health = data.health.find(
@@ -1230,18 +1193,20 @@ export function ConnectedWorkspace() {
                         disabled={!data.documents.length}
                         onClick={() => openDialog("share")}
                       >
-                        Share documents <ArrowUpRight size={16} />
+                        {shareIds.length ? `Share ${shareIds.length} selected` : "Share documents"} <ArrowUpRight size={16} />
                       </Button>
                     )}
                   </div>
+                  {shareIds.length>0&&<div className="document-selection-summary"><span>{shareIds.length} of 20 documents selected for sharing</span><Button variant="ghost" onClick={()=>setShareIds([])}>Clear selection</Button></div>}
                   <div className="connected-panel connected-list">
                     {data.documents.map((doc) => (
                       <div className="list-row" key={doc.id}>
+                        {manager&&<input className="document-selection" type="checkbox" aria-label={`Select ${doc.name} for sharing`} disabled={!shareIds.includes(doc.id)&&shareIds.length>=20} checked={shareIds.includes(doc.id)} onChange={event=>setShareIds(previous=>event.target.checked?[...previous,doc.id].slice(0,20):previous.filter(id=>id!==doc.id))}/>}
                         <span className="activity-icon">
                           <Files size={19} />
                         </span>
                         <div className="row-copy">
-                          <strong>{doc.name}</strong>
+                          <button type="button" className="document-open" onClick={()=>{const next=new URLSearchParams(params);next.set("document",doc.id);setParams(next);}}>{doc.name}</button>
                           <small>
                             {
                               data.suppliers.find(
@@ -1283,7 +1248,7 @@ export function ConnectedWorkspace() {
                     {data.shares.map((doc) => (
                       <div className="list-row" key={doc.id}>
                         <div className="row-copy">
-                          <strong>{doc.name}</strong>
+                          <button type="button" className="document-open" onClick={()=>{const next=new URLSearchParams(params);next.set("document",doc.document_id);setParams(next);}}>{doc.name}</button>
                           <small>
                             From {doc.sender_name} · {dateLabel(doc.shared_at)}
                           </small>
@@ -1355,10 +1320,10 @@ export function ConnectedWorkspace() {
                       return (
                         <div
                           className="list-row connected-request-row"
-                          key={request.id}
+                          key={request.id} data-focused={params.get("focus")===request.id}
                         >
                           <div className="row-copy">
-                            <strong>{request.title}</strong>
+                            <button type="button" className="document-open" onClick={()=>{const next=new URLSearchParams(params);next.set("focus",request.id);setParams(next);}}>{request.title}</button>
                             <small>
                               {company?.legal_name} · Due{" "}
                               {dateLabel(request.due_at)}
@@ -1428,7 +1393,7 @@ export function ConnectedWorkspace() {
                         <Package size={19} />
                       </span>
                       <div className="row-copy">
-                        <strong>{product.name}</strong>
+                        <button className="document-open" onClick={()=>{const next=new URLSearchParams(params);next.set("product",product.id);setParams(next);}}>{product.name}</button>
                         <small>
                           {
                             data.suppliers.find(
@@ -1720,7 +1685,7 @@ export function ConnectedWorkspace() {
                       <span>
                         <strong>Email updates</strong>
                         <small>
-                          Save your preference for future workspace updates. Automatic team and supplier emails are not active yet. Sign-in emails are sent separately.
+                          Save your preference for future workspace updates. Team invitations can be delivered by email. Automatic supplier reminders are not active yet. Sign-in emails are sent separately.
                         </small>
                       </span>
                       <input
@@ -1775,7 +1740,7 @@ export function ConnectedWorkspace() {
                   )}
                 </div>
               )}
-              {["suppliers","documents","requests","products","team","activity"].includes(view) && data.total>50 && <PageControls page={page} total={data.total} busy={refreshing} onChange={next=>setParams({view,org:data.org.id,page:String(next)})}/>}
+              {["suppliers","documents","requests","products","team","activity"].includes(view) && data.total>50 && <PageControls page={page} total={data.total} busy={refreshing} onChange={pageNumber=>setParams(previous=>{const next=new URLSearchParams(previous);next.set("page",String(pageNumber));return next;})}/>}
               </> }
             </MotionPanel>
           )}
@@ -1785,6 +1750,9 @@ export function ConnectedWorkspace() {
           <span>A product of VOVERE</span>
         </footer>
       </div>
+      {data && <RequestDetails id={params.get("focus")} organizationId={data.org.id} onClose={()=>{const next=new URLSearchParams(params);next.delete("focus");setParams(next,{replace:true});}}/>}
+      {data && <ProductDetails onDirtyChange={setProductDirty} id={params.get("product")} organizationId={data.org.id} manager={manager} onClose={()=>{const next=new URLSearchParams(params);next.delete("product");setParams(next,{replace:true});}} onChanged={()=>void load()}/>}
+      {data && <DocumentPreview id={params.get("document")} organizationId={data.org.id} manager={manager} onClose={()=>{const next=new URLSearchParams(params);next.delete("document");setParams(next,{replace:true});}} onChanged={()=>void load()}/>}
       {data && <SupplierTrash key={data.org.id} open={trashOpen} organizationId={data.org.id} supplier={removeSupplier} onClose={()=>setTrashOpen(false)} onChanged={removed=>{if(removed){setSupplierDirty(false);setSelected(null);setGenerated("");}else void load();}}/>}
       <Dialog open={!!leaveIntent || blocker.state==="blocked"} onClose={keepEditing} title="Keep your changes?" className="leave-dialog">
         <p>You have unsaved changes. Keep editing or leave without saving.</p>
@@ -1929,7 +1897,7 @@ export function ConnectedWorkspace() {
                     </Select>
                   </FieldLabel>
                   <FieldLabel>Find documents<Input type="search" value={lookupQuery} onChange={event=>setLookupQuery(event.target.value)} placeholder="Search document names…"/></FieldLabel>
-                  <p className="quiet-note">{shareIds.length} documents selected. Search to find older files; your selection is retained.</p>
+                  <p className="quiet-note">{shareIds.length} of 20 documents selected. Search to find older files; your selection is retained.</p>
                   <fieldset className="share-document-options">
                     <legend>Choose documents to share</legend>
                     {data.documents.map((doc) => (
@@ -1938,8 +1906,8 @@ export function ConnectedWorkspace() {
                           type="checkbox"
                           name="documents"
                           value={doc.id}
-                          checked={shareIds.includes(doc.id)}
-                          onChange={event=>setShareIds(event.target.checked?[...shareIds,doc.id]:shareIds.filter(id=>id!==doc.id))}
+                          disabled={!shareIds.includes(doc.id)&&shareIds.length>=20} checked={shareIds.includes(doc.id)}
+                          onChange={event=>setShareIds(event.target.checked?[...shareIds,doc.id].slice(0,20):shareIds.filter(id=>id!==doc.id))}
                         />
                         <span>{doc.name}</span>
                       </FieldLabel>
