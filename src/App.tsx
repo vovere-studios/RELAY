@@ -2,11 +2,13 @@ import { LoadingIndicator } from './components/ui';
 import { lazy, Suspense } from "react";
 import { createBrowserRouter, createRoutesFromElements, Navigate, Outlet, Route, RouterProvider } from "react-router-dom";
 import { MotionDirector } from "./components/Motion";
+import { InteractionMotion } from './components/InteractionMotion';
 import { RouteFocus } from "./components/RouteFocus";
 import { ThemeProvider } from "./lib/theme";
 import { FeedbackProvider } from "./components/Feedback";
 
 import { Website } from "./pages/marketing/Website";
+import { Pricing } from './pages/marketing/Pricing';
 
 const CloudAccount = lazy(() =>
   import("./pages/Cloud").then((module) => ({ default: module.CloudAccount })),
@@ -29,8 +31,9 @@ const JoinWorkspace = lazy(() =>
 );
 const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin").then(module=>({default:module.PlatformAdmin})));
 const Demo = lazy(() => import("./pages/Demo").then(module => ({default:module.Demo})));
+const BillingCheckout = lazy(() => import('./pages/BillingCheckout').then(module => ({default:module.BillingCheckout})));
 function AppLayout() {
-  return <ThemeProvider><FeedbackProvider><Suspense fallback={<main id="main" tabIndex={-1} className="route-pending" role="status"><span className="wordmark">relay ↗</span><LoadingIndicator label="Opening your workspace…"/></main>}>
+  return <ThemeProvider><FeedbackProvider><InteractionMotion/><Suspense fallback={<main id="main" tabIndex={-1} className="route-pending" role="status"><span className="wordmark">relay ↗</span><LoadingIndicator label="Opening your workspace…"/></main>}>
     <Outlet/><RouteFocus/><MotionDirector/>
   </Suspense></FeedbackProvider></ThemeProvider>;
 }
@@ -41,6 +44,8 @@ export function App() {
     <Route element={<AppLayout/>}>
 
               <Route index element={<Website />} />
+              <Route path="pricing" element={<Pricing />} />
+              <Route path="pay" element={<BillingCheckout />} />
               <Route
                 path="signup"
                 element={<CloudAccount key="signup" signup />}

@@ -1,0 +1,53 @@
+-- All identities, company data and billing records are rolled back. No provider calls.
+begin;
+do $test$
+declare owner_id uuid:=gen_random_uuid(); admin_id uuid:=gen_random_uuid(); employee uuid:=gen_random_uuid(); outsider uuid:=gen_random_uuid(); org uuid:=gen_random_uuid(); other_org uuid:=gen_random_uuid(); v jsonb; attempt uuid; other_attempt uuid; denied boolean; cust text:='ctm_'||repeat('a',26); txn text:='txn_'||repeat('a',26); subid text:='sub_'||repeat('a',26); stamp timestamptz:=now();
+begin
+ insert into auth.users(id,email,raw_app_meta_data,raw_user_meta_data) values(owner_id,'billing-owner@example.invalid','{}','{}'),(admin_id,'billing-admin@example.invalid','{}','{}'),(employee,'billing-member@example.invalid','{}','{}'),(outsider,'billing-outsider@example.invalid','{}','{}');
+ insert into public.organizations(id,owner_id,legal_name) values(org,owner_id,'Billing test company'),(other_org,outsider,'Other billing test company');
+ insert into public.organization_members(organization_id,user_id,role) values(org,employee,'member'),(org,admin_id,'admin');
+ perform set_config('request.jwt.claim.sub',owner_id::text,true);execute 'set local role authenticated';
+ v:=public.relay_billing_snapshot(org,'sandbox');
+ if v->>'plan'<>'free' or not (v->>'can_manage')::boolean or (v->'usage'->>'seats')::int<>3 then raise exception 'Owner snapshot or seat usage incorrect';end if;
+ denied:=false;begin perform public.relay_billing_service('begin',jsonb_build_object('organization_id',org,'environment','sandbox','actor_id',owner_id,'plan','core','cycle','month','billing_email','owner@example.invalid'));exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Client can invoke billing writes';end if;
+ execute 'reset role';perform set_config('request.jwt.claim.sub',employee::text,true);execute 'set local role authenticated';
+ v:=public.relay_billing_snapshot(org,'sandbox');if (v->>'can_manage')::boolean then raise exception 'Member has billing management';end if;
+ execute 'reset role';perform set_config('request.jwt.claim.sub',outsider::text,true);execute 'set local role authenticated';
+ denied:=false;begin perform public.relay_billing_snapshot(org,'sandbox');exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Foreign company can read billing';end if;
+ execute 'reset role';execute 'set local role service_role';
+ denied:=false;begin perform public.relay_billing_service('begin',jsonb_build_object('organization_id',org,'environment','sandbox','actor_id',employee,'plan','core','cycle','month','billing_email','member@example.invalid'));exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Server permits employee purchase';end if;
+ v:=public.relay_billing_service('begin',jsonb_build_object('organization_id',org,'environment','sandbox','actor_id',owner_id,'plan','core','cycle','month','billing_email','owner@example.invalid'));
+ attempt:=(v->>'id')::uuid;if not (v->>'created')::boolean then raise exception 'No checkout attempt';end if;
+ v:=public.relay_billing_service('begin',jsonb_build_object('organization_id',org,'environment','sandbox','actor_id',owner_id,'plan','core','cycle','month','billing_email','owner@example.invalid'));
+ if (v->>'created')::boolean or (v->>'id')::uuid<>attempt then raise exception 'Duplicate checkout created';end if;
+ denied:=false;begin perform public.relay_billing_service('begin',jsonb_build_object('organization_id',org,'environment','sandbox','actor_id',admin_id,'plan','pro','cycle','year','billing_email','admin@example.invalid'));exception when raise_exception then denied:=true;end;if not denied then raise exception 'Parallel different order allowed';end if;
+ perform public.relay_billing_service('customer',jsonb_build_object('organization_id',org,'environment','sandbox','actor_id',owner_id,'attempt_id',attempt,'customer_id',cust));
+ denied:=false;begin perform public.relay_billing_service('apply',jsonb_build_object('environment','sandbox','event_id','evt_'||repeat('z',26),'occurred_at',stamp,'provider_updated_at',stamp,'customer_id',cust,'subscription_id',subid,'attempt_id',attempt,'transaction_id',txn,'plan','core','cycle','month','status','active'));exception when raise_exception then denied:=true;end;if not denied then raise exception 'Unrecorded transaction granted plan';end if;
+ perform public.relay_billing_service('transaction',jsonb_build_object('organization_id',org,'environment','sandbox','actor_id',owner_id,'attempt_id',attempt,'transaction_id',txn));
+ v:=public.relay_billing_service('resume',jsonb_build_object('environment','sandbox','actor_id',admin_id,'transaction_id',txn));if (v->>'organization_id')::uuid<>org then raise exception 'Company checkout resume failed';end if;
+ denied:=false;begin perform public.relay_billing_service('resume',jsonb_build_object('environment','sandbox','actor_id',outsider,'transaction_id',txn));exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Outsider can resume order';end if;
+ v:=public.relay_billing_service('apply',jsonb_build_object('environment','sandbox','event_id','evt_'||repeat('a',26),'occurred_at',stamp,'provider_updated_at',stamp,'customer_id',cust,'subscription_id',subid,'attempt_id',attempt,'transaction_id',txn,'plan','core','cycle','month','status','active','period_end',stamp+interval '1 month'));
+ if not (v->>'applied')::boolean then raise exception 'Subscription not applied';end if;
+ v:=public.relay_billing_service('apply',jsonb_build_object('environment','sandbox','event_id','evt_'||repeat('a',26),'occurred_at',stamp,'provider_updated_at',stamp,'customer_id',cust,'subscription_id',subid,'attempt_id',attempt,'transaction_id',txn,'plan','core','cycle','month','status','active'));
+ if not (v->>'duplicate')::boolean then raise exception 'Duplicate event not ignored';end if;
+ v:=public.relay_billing_service('apply',jsonb_build_object('environment','sandbox','event_id','evt_'||repeat('b',26),'occurred_at',stamp-interval '1 minute','provider_updated_at',stamp-interval '1 minute','customer_id',cust,'subscription_id',subid,'plan','pro','cycle','year','status','active'));
+ if not (v->>'stale')::boolean then raise exception 'Old event not ignored';end if;
+ denied:=false;begin perform public.relay_billing_service('begin',jsonb_build_object('organization_id',org,'environment','sandbox','actor_id',owner_id,'plan','pro','cycle','month','billing_email','owner@example.invalid'));exception when raise_exception then denied:=true;end;if not denied then raise exception 'Existing subscription permits second subscription';end if;
+ -- Separate organizations cannot reuse the same provider customer or its portal.
+ v:=public.relay_billing_service('begin',jsonb_build_object('organization_id',other_org,'environment','sandbox','actor_id',outsider,'plan','core','cycle','month','billing_email','owner@example.invalid'));other_attempt:=(v->>'id')::uuid;
+ denied:=false;begin perform public.relay_billing_service('customer',jsonb_build_object('organization_id',other_org,'environment','sandbox','actor_id',outsider,'attempt_id',other_attempt,'customer_id',cust));exception when unique_violation then denied:=true;end;if not denied then raise exception 'Customer mapped to two companies';end if;
+ denied:=false;begin perform public.relay_billing_service('portal',jsonb_build_object('organization_id',org,'environment','sandbox','actor_id',outsider));exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Cross-company portal allowed';end if;
+ execute 'reset role';perform set_config('request.jwt.claim.sub',owner_id::text,true);execute 'set local role authenticated';
+ v:=public.relay_billing_snapshot(org,'production');if v->>'plan'<>'free' then raise exception 'Sandbox upgraded production plan';end if;
+ v:=public.relay_billing_snapshot(org,'sandbox');if v->>'plan'<>'core' then raise exception 'Old event changed plan';end if;
+ execute 'reset role';execute 'set local role service_role';
+ perform public.relay_billing_service('apply',jsonb_build_object('environment','sandbox','event_id','evt_'||repeat('c',26),'occurred_at',stamp+interval '1 second','provider_updated_at',stamp+interval '1 second','customer_id',cust,'subscription_id',subid,'plan','core','cycle','month','status','active','period_end',stamp+interval '1 month','cancel_at',stamp+interval '1 month'));
+ execute 'reset role';perform set_config('request.jwt.claim.sub',owner_id::text,true);execute 'set local role authenticated';
+ v:=public.relay_billing_snapshot(org,'sandbox');if v->>'plan'<>'core' or v->>'cancel_at' is null then raise exception 'Scheduled cancellation removed current plan prematurely';end if;
+ execute 'reset role';execute 'set local role service_role';
+ perform public.relay_billing_service('apply',jsonb_build_object('environment','sandbox','event_id','evt_'||repeat('d',26),'occurred_at',stamp+interval '1 month','provider_updated_at',stamp+interval '1 month','customer_id',cust,'subscription_id',subid,'plan','core','cycle','month','status','canceled'));
+ execute 'reset role';perform set_config('request.jwt.claim.sub',owner_id::text,true);execute 'set local role authenticated';
+ v:=public.relay_billing_snapshot(org,'sandbox');if v->>'plan'<>'free' or v->>'status'<>'canceled' then raise exception 'Completed cancellation did not fall back to free';end if;
+ raise notice 'Company billing passed: role isolation, usage, duplicate checkout, original order binding, stale/duplicate events, customer uniqueness, sandbox isolation and cancellation.';
+end; $test$;
+rollback;

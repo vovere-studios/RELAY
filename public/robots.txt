@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /lovable/
+
+Sitemap: https://relay.vovere-studios.com/sitemap.xml

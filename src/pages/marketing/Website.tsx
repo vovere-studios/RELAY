@@ -107,9 +107,7 @@ export function PublicHeader() {
         <a href="/#how-it-works" onClick={() => setMenu(false)}>
           How it works
         </a>
-        <a href="/#questions" onClick={() => setMenu(false)}>
-          Questions
-        </a>
+        <Link to="/pricing" onClick={() => setMenu(false)}>Pricing</Link>
         <Link to="/login" onClick={()=>setMenu(false)}>Sign in</Link>
       </nav>
       <Link className="public-start" to="/signup">
@@ -162,6 +160,7 @@ export function PublicFooter() {
       <div>
         <Link to="/app">Explore the demo</Link>
         <Link to="/login">Sign in</Link>
+        <Link to="/pricing">Pricing</Link>
         <a href="/#questions">Questions</a>
       </div>
       <span>SUPPLIER INFORMATION, CONNECTED.</span>

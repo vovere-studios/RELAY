@@ -3,8 +3,8 @@ import { RefreshCw } from 'lucide-react';
 import { reducedMotion } from '../lib/motion';
 
 /** Turns while the request is active, then completes its revolution instead of snapping home. */
-export function RefreshControl({ busy, onRefresh, compact = false }: {
-  busy: boolean; onRefresh: () => void; compact?: boolean;
+export function RefreshControl({ busy, onRefresh, compact = false, label = 'Refresh workspace', pendingLabel = 'Updating workspace' }: {
+  busy: boolean; onRefresh: () => void; compact?: boolean; label?: string; pendingLabel?: string;
 }) {
   const icon = useRef<SVGSVGElement>(null);
   const spin = useRef<Animation | null>(null);
@@ -36,7 +36,7 @@ export function RefreshControl({ busy, onRefresh, compact = false }: {
   }, [busy]);
   useEffect(() => () => { spin.current?.cancel(); landing.current?.cancel(); }, []);
   return <button type="button" className={compact ? 'icon-button workspace-refresh' : 'navigation-refresh'}
-    aria-label={busy ? 'Updating workspace' : 'Refresh workspace'} aria-busy={busy} disabled={busy} onClick={onRefresh}>
+    aria-label={busy ? pendingLabel : label} aria-busy={busy} disabled={busy} onClick={onRefresh}>
     <RefreshCw ref={icon} size={compact ? 18 : 17} strokeWidth={1.65} className="refresh-glyph" aria-hidden="true"/>
     {!compact && <span>{busy ? 'Updating…' : 'Refresh'}</span>}
   </button>;

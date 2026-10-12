@@ -9,6 +9,7 @@ export type Member = {
   role: "owner" | "admin" | "member";
 };
 export type SharedDocument = {
+  review_status?: string;
   id: string;
   document_id: string;
   shared_at: string;

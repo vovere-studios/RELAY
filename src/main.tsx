@@ -7,6 +7,7 @@ import "./styles/refinement.css";
 import "./styles/connected.css";
 import "./styles/polish.css";
 import "./styles/interactions.css";
+import './styles/billing.css';
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />

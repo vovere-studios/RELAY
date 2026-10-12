@@ -13,6 +13,8 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as ApiAdminActionRouteImport } from './routes/api/admin/action'
 import { Route as ApiAuthEmailHookRouteImport } from './routes/api/auth/email-hook'
+import { Route as ApiBillingWebhookRouteImport } from './routes/api/billing/webhook'
+import { Route as ApiBillingWorkspaceRouteImport } from './routes/api/billing/workspace'
 import { Route as ApiIntakeConfirmationRouteImport } from './routes/api/intake/confirmation'
 import { Route as ApiWorkspaceInviteRouteImport } from './routes/api/workspace/invite'
 import { Route as ApiWorkspaceSubmissionEmailRouteImport } from './routes/api/workspace/submission-email'
@@ -36,6 +38,16 @@ const ApiAdminActionRoute = ApiAdminActionRouteImport.update({
 const ApiAuthEmailHookRoute = ApiAuthEmailHookRouteImport.update({
   id: '/api/auth/email-hook',
   path: '/api/auth/email-hook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingWebhookRoute = ApiBillingWebhookRouteImport.update({
+  id: '/api/billing/webhook',
+  path: '/api/billing/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingWorkspaceRoute = ApiBillingWorkspaceRouteImport.update({
+  id: '/api/billing/workspace',
+  path: '/api/billing/workspace',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiIntakeConfirmationRoute = ApiIntakeConfirmationRouteImport.update({
@@ -66,6 +78,8 @@ export interface FileRoutesByFullPath {
   '/$': typeof SplatRoute
   '/api/admin/action': typeof ApiAdminActionRoute
   '/api/auth/email-hook': typeof ApiAuthEmailHookRoute
+  '/api/billing/webhook': typeof ApiBillingWebhookRoute
+  '/api/billing/workspace': typeof ApiBillingWorkspaceRoute
   '/api/intake/confirmation': typeof ApiIntakeConfirmationRoute
   '/api/workspace/invite': typeof ApiWorkspaceInviteRoute
   '/api/workspace/submission-email': typeof ApiWorkspaceSubmissionEmailRoute
@@ -76,6 +90,8 @@ export interface FileRoutesByTo {
   '/$': typeof SplatRoute
   '/api/admin/action': typeof ApiAdminActionRoute
   '/api/auth/email-hook': typeof ApiAuthEmailHookRoute
+  '/api/billing/webhook': typeof ApiBillingWebhookRoute
+  '/api/billing/workspace': typeof ApiBillingWorkspaceRoute
   '/api/intake/confirmation': typeof ApiIntakeConfirmationRoute
   '/api/workspace/invite': typeof ApiWorkspaceInviteRoute
   '/api/workspace/submission-email': typeof ApiWorkspaceSubmissionEmailRoute
@@ -87,6 +103,8 @@ export interface FileRoutesById {
   '/$': typeof SplatRoute
   '/api/admin/action': typeof ApiAdminActionRoute
   '/api/auth/email-hook': typeof ApiAuthEmailHookRoute
+  '/api/billing/webhook': typeof ApiBillingWebhookRoute
+  '/api/billing/workspace': typeof ApiBillingWorkspaceRoute
   '/api/intake/confirmation': typeof ApiIntakeConfirmationRoute
   '/api/workspace/invite': typeof ApiWorkspaceInviteRoute
   '/api/workspace/submission-email': typeof ApiWorkspaceSubmissionEmailRoute
@@ -99,6 +117,8 @@ export interface FileRouteTypes {
     | '/$'
     | '/api/admin/action'
     | '/api/auth/email-hook'
+    | '/api/billing/webhook'
+    | '/api/billing/workspace'
     | '/api/intake/confirmation'
     | '/api/workspace/invite'
     | '/api/workspace/submission-email'
@@ -109,6 +129,8 @@ export interface FileRouteTypes {
     | '/$'
     | '/api/admin/action'
     | '/api/auth/email-hook'
+    | '/api/billing/webhook'
+    | '/api/billing/workspace'
     | '/api/intake/confirmation'
     | '/api/workspace/invite'
     | '/api/workspace/submission-email'
@@ -119,6 +141,8 @@ export interface FileRouteTypes {
     | '/$'
     | '/api/admin/action'
     | '/api/auth/email-hook'
+    | '/api/billing/webhook'
+    | '/api/billing/workspace'
     | '/api/intake/confirmation'
     | '/api/workspace/invite'
     | '/api/workspace/submission-email'
@@ -130,6 +154,8 @@ export interface RootRouteChildren {
   SplatRoute: typeof SplatRoute
   ApiAdminActionRoute: typeof ApiAdminActionRoute
   ApiAuthEmailHookRoute: typeof ApiAuthEmailHookRoute
+  ApiBillingWebhookRoute: typeof ApiBillingWebhookRoute
+  ApiBillingWorkspaceRoute: typeof ApiBillingWorkspaceRoute
   ApiIntakeConfirmationRoute: typeof ApiIntakeConfirmationRoute
   ApiWorkspaceInviteRoute: typeof ApiWorkspaceInviteRoute
   ApiWorkspaceSubmissionEmailRoute: typeof ApiWorkspaceSubmissionEmailRoute
@@ -164,6 +190,20 @@ declare module '@tanstack/react-router' {
       path: '/api/auth/email-hook'
       fullPath: '/api/auth/email-hook'
       preLoaderRoute: typeof ApiAuthEmailHookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/webhook': {
+      id: '/api/billing/webhook'
+      path: '/api/billing/webhook'
+      fullPath: '/api/billing/webhook'
+      preLoaderRoute: typeof ApiBillingWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/workspace': {
+      id: '/api/billing/workspace'
+      path: '/api/billing/workspace'
+      fullPath: '/api/billing/workspace'
+      preLoaderRoute: typeof ApiBillingWorkspaceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/intake/confirmation': {
@@ -202,6 +242,8 @@ const rootRouteChildren: RootRouteChildren = {
   SplatRoute: SplatRoute,
   ApiAdminActionRoute: ApiAdminActionRoute,
   ApiAuthEmailHookRoute: ApiAuthEmailHookRoute,
+  ApiBillingWebhookRoute: ApiBillingWebhookRoute,
+  ApiBillingWorkspaceRoute: ApiBillingWorkspaceRoute,
   ApiIntakeConfirmationRoute: ApiIntakeConfirmationRoute,
   ApiWorkspaceInviteRoute: ApiWorkspaceInviteRoute,
   ApiWorkspaceSubmissionEmailRoute: ApiWorkspaceSubmissionEmailRoute,

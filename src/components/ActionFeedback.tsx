@@ -82,9 +82,13 @@ export function ActionButton({
   const button = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!['success', 'error'].includes(phase) || reducedMotion()) return;
-    const animation = button.current?.animate([
-      { transform: 'scale(.985)' }, { transform: 'none' },
-    ], { duration: 420, easing: springEasing(420) });
+    const animation = phase === 'success'
+      ? button.current?.animate([{ translate: '0 1.5px' }, { translate: '0 0' }], { duration: 560, easing: springEasing(560, 21, 260) })
+      : button.current?.animate([
+        { translate: '0 0', offset: 0 }, { translate: '-4px 0', offset: .17 },
+        { translate: '3px 0', offset: .38 }, { translate: '-1.5px 0', offset: .61 },
+        { translate: '.5px 0', offset: .8 }, { translate: '0 0', offset: 1 },
+      ], { duration: 460, easing: 'ease-in-out' });
     return () => animation?.cancel();
   },[phase,outcomeKey]);
   useEffect(() => {
@@ -101,7 +105,7 @@ export function ActionButton({
     </span>
     <span className="action-button-glyph" aria-hidden="true">
       <ArrowRight className="action-idle" size={16}/>
-      {phase === "pending" && <span className="action-working"><i/><i/><i/></span>}
+      <span className="action-working"><i/><i/><i/></span>
       {(phase === "success" || phase === "error") && <OutcomeMark key={`${phase}:${outcomeKey}`} tone={phase}/>}
     </span>
   </Button>;
@@ -111,7 +115,7 @@ export function ActionButton({
 export function ActionIcon({ kind = "add" }: { kind?: "add" | "upload" | "adjust" | "request" }) {
   return <svg className={`action-icon action-icon-${kind}`} width="18" height="18" viewBox="0 0 24 24"
     fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    {kind === "add" ? <path className="action-icon-plus" d="M12 5v14M5 12h14"/> : kind === "upload" ? <>
+    {kind === "add" ? <g className="action-icon-plus"><path className="action-icon-plus-v" d="M12 5v14"/><path className="action-icon-plus-h" d="M5 12h14"/></g> : kind === "upload" ? <>
       <path className="action-icon-tray" d="M4 15v5h16v-5"/>
       <g className="action-icon-lift"><path d="M12 16V4m-5 5 5-5 5 5"/></g>
     </> : kind === "adjust" ? <>
@@ -120,9 +124,8 @@ export function ActionIcon({ kind = "add" }: { kind?: "add" | "upload" | "adjust
       <path className="action-icon-knob action-icon-knob-b" d="M16 9v6"/>
       <path className="action-icon-knob action-icon-knob-c" d="M10 15v6"/>
     </> : <>
-      <path className="action-icon-frame" d="M6 3h8l4 4v14H6V3m8 0v5h4"/>
-      <path className="action-icon-request-line" d="M9 12h6M9 16h4"/>
-      <g className="action-icon-request"><path d="M19 11v7m-3-3 3 3 3-3"/></g>
+      <path className="action-icon-request-page" d="M13 3H6a1.5 1.5 0 0 0-1.5 1.5v15A1.5 1.5 0 0 0 6 21h12a1.5 1.5 0 0 0 1.5-1.5V9L13 3Zm0 0v6h6.5"/>
+      <g className="action-icon-request"><path d="M12 11v6m-3-3 3 3 3-3"/></g>
     </>}
   </svg>;
 }
@@ -132,7 +135,7 @@ export function OutcomeMark({ tone }: { tone: "success" | "error" }) {
   return <span className="outcome-mark" data-tone={tone} aria-hidden="true">
     <svg viewBox="0 0 40 40" fill="none">
       {tone === "success" ? <g className="outcome-signature">
-        <path className="outcome-signature-stroke" pathLength="1" d="M10 21L17 28L30 12"/>
+        <path className="outcome-signature-stroke" pathLength="1" d="M9.5 20.5 15.8 27a1.5 1.5 0 0 0 2.3-.15L30.5 11.5"/>
       </g> : <>
         <g className="outcome-refusal"><path className="outcome-stroke" pathLength="1" d="M20 11v12"/><circle className="outcome-dot" cx="20" cy="29" r="1.7"/></g>
       </>}

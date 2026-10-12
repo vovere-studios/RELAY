@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
+import { routeSeo, syncPageSeo } from "../lib/seo";
 
 function contextKey(pathname:string,search:string) {
   const params=new URLSearchParams(search);
@@ -15,6 +16,7 @@ export function RouteFocus() {
     return()=>window.removeEventListener('scroll',record);
   },[]);
   useLayoutEffect(() => {
+    syncPageSeo(pathname);
     const before = previous.current;
     const oldParams = new URLSearchParams(before?.search);
     const nextParams = new URLSearchParams(search);
@@ -39,7 +41,7 @@ export function RouteFocus() {
     window.addEventListener('touchstart',stopRestoring,{passive:true});
     const update = () => {
       const heading = main?.querySelector("h1");
-      const title = `${heading?.innerText.replace(/\s+/g, " ").replace(/\.$/, "") || "Workspace"} — Relay`;
+      const title = pathname === "/" || pathname === '/pricing' ? routeSeo(pathname).title : `${heading?.innerText.replace(/\s+/g, " ").replace(/\.$/, "") || "Workspace"} — Relay`;
       if (document.title !== title) document.title = title;
       // The previous list can be replaced by a loading surface while data arrives.
       if(restorePending&&!main?.querySelector('.workspace-refresh-status,.connected-loading')){

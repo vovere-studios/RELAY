@@ -198,6 +198,8 @@ export function Dialog({ open, onClose, title, heading, children, footer, classN
   const escapeFromMenu = useRef(false);
   const keyboard = useRef(false);
   const trigger = useRef<HTMLElement | null>(null);
+  const pointerTrigger = useRef<{ element: HTMLElement; time: number } | null>(null);
+  const openingTransform = useRef("translateY(20px) scale(.91)");
   const [presentation, setPresentation] = useState({ open, key: 0 });
   // Remount before committing a fresh form, rather than changing its controlled fields in an effect.
   if (presentation.open !== open)
@@ -224,7 +226,14 @@ export function Dialog({ open, onClose, title, heading, children, footer, classN
   };
   useEffect(() => {
     const key = () => { keyboard.current = true; };
-    const pointer = () => { keyboard.current = false; };
+    const pointer = (event: PointerEvent) => {
+      keyboard.current = false;
+      // Safari doesn't focus every clicked button. Keep its actual origin for motion and focus return.
+      if (!ref.current?.open && event.target instanceof Element) {
+        const element = event.target.closest<HTMLElement>('button,a,[role="button"]');
+        pointerTrigger.current = element ? { element, time: performance.now() } : null;
+      }
+    };
     window.addEventListener("keydown", key, true);
     window.addEventListener("pointerdown", pointer, true);
     return () => {
@@ -239,18 +248,32 @@ export function Dialog({ open, onClose, title, heading, children, footer, classN
     const material = dialog.querySelector<HTMLElement>(".dialog-material");
     const surface = dialog.querySelector<HTMLElement>(".dialog-surface");
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const animate = !reduced && !keyboard.current;
+    const animate = !reduced;
     if (!animate) motionFrame.current = null;
     const animations: Animation[] = [];
     let active = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const originTransform = () => motion === "inspector"
-      ? (window.innerWidth <= 600 ? "translateY(32px)" : "translateX(32px)")
-      : motion === "sheet" ? "translateY(-8px) scale(.94)" : "translateY(16px) scale(.97)";
+    const originTransform = () => keyboard.current ? "none" : openingTransform.current;
     if (open) {
       if (!dialog.open) {
-        trigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        const pointer = pointerTrigger.current;
+        trigger.current = !keyboard.current && pointer?.element.isConnected && performance.now() - pointer.time < 800
+          ? pointer.element : document.activeElement instanceof HTMLElement ? document.activeElement : null;
         dialog.showModal();
+        if (motion === "inspector") {
+          dialog.style.transformOrigin = window.innerWidth <= 600 ? "center bottom" : "right center";
+          openingTransform.current = window.innerWidth <= 600 ? "translateY(44px) scale(.97)" : "translateX(44px) scale(.97)";
+        } else {
+          const bounds = dialog.getBoundingClientRect();
+          const origin = trigger.current?.getBoundingClientRect();
+          const x = origin ? origin.left + origin.width / 2 : bounds.left + bounds.width / 2;
+          const y = origin ? origin.top + origin.height / 2 : bounds.top + bounds.height / 2;
+          dialog.style.transformOrigin = `${Math.max(20, Math.min(bounds.width - 20, x - bounds.left))}px ${Math.max(20, Math.min(bounds.height - 20, y - bounds.top))}px`;
+          // Travel toward the source, bounded even when the initiating button is far from the form.
+          const dx = Math.max(-24, Math.min(24, (x - bounds.left - bounds.width / 2) * .08));
+          const dy = Math.max(-28, Math.min(28, (y - bounds.top - bounds.height / 2) * .08));
+          openingTransform.current = `translate(${dx}px,${dy}px) scale(.91)`;
+        }
       }
       dialog.dataset.state = "open";
       dialog.dataset.keyboard = String(keyboard.current);
@@ -264,17 +287,12 @@ export function Dialog({ open, onClose, title, heading, children, footer, classN
         scrollLocked.current = true;
       }
       document.body.style.overflow = "hidden";
-      if (motion === 'sheet' && trigger.current) {
-        const origin = trigger.current.getBoundingClientRect();
-        const bounds = dialog.getBoundingClientRect();
-        dialog.style.transformOrigin = `${Math.max(24, Math.min(bounds.width - 24, origin.left + origin.width / 2 - bounds.left))}px ${Math.max(16, Math.min(bounds.height - 16, origin.top + origin.height / 2 - bounds.top))}px`;
-      }
       if (animate && material && surface) {
         // Material and content travel together: no empty expanding rectangle or delayed form.
         animations.push(dialog.animate([
-          motionFrame.current || { transform: originTransform(), opacity: .1 },
+          motionFrame.current || { transform: originTransform(), opacity: 0 },
           { transform: "none", opacity: 1 },
-        ], { duration: 460, easing: springEasing(), fill: "both" }));
+        ], { duration: keyboard.current ? 180 : 520, easing: keyboard.current ? "ease-out" : springEasing(520, 24, 245), fill: "both" }));
         animations[0].finished.then(() => {
           if (active) { motionFrame.current = null; animations[0].cancel(); }
         }).catch(() => {});
@@ -284,7 +302,7 @@ export function Dialog({ open, onClose, title, heading, children, footer, classN
       if (animate && material && surface) {
         animations.push(dialog.animate([
           motionFrame.current || { transform: "none", opacity: 1 },
-          { transform: motion === "inspector" || motion === "sheet" ? originTransform() : "translateY(8px) scale(.985)", opacity: 0 },
+          { transform: originTransform(), opacity: 0 },
         ], { duration: 180, easing: "cubic-bezier(.4,0,1,1)", fill: "forwards" }));
       }
       timer = setTimeout(() => { motionFrame.current = null; dialog.close(); restoreScroll(); }, animate ? 180 : 0);

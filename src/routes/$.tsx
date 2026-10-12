@@ -1,2 +1,3 @@
 import { createFileRoute } from "@tanstack/react-router";
-export const Route = createFileRoute("/$")({ component: () => null });
+import { seoHead } from "../lib/seo";
+export const Route = createFileRoute("/$")({ head: ({ params }) => seoHead(`/${params._splat || ""}`), component: () => null });

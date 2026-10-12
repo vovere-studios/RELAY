@@ -1,7 +1,8 @@
+import { WorkspaceUpdates, type WorkspaceUpdate } from './WorkspaceUpdates';
 import { InlineError } from './InlineError';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, CalendarClock, Files, ArrowUpRight, Building2, Inbox, Activity } from 'lucide-react';
+import { ArrowRight, CalendarClock, Files, ArrowUpRight, Building2, Inbox } from 'lucide-react';
 import { requireSupabase } from '../lib/supabase';
 import { dateLabel, errorMessage } from '../lib/cloud-api';
 import { LoadingIndicator } from './ui';
@@ -11,11 +12,10 @@ import { Select } from './Select';
 import { MotionPanel } from './Motion';
 
 type Task = { id: string; title: string; detail: string; href: string; kind: 'expiry' | 'review' | 'request' | 'information'; urgent: boolean; order: string };
-type Event = { id: string; title: string; detail: string; created_at: string };
 const icons = { expiry: CalendarClock, review: Files, request: ArrowUpRight, information: Building2 };
 const day = (date: Date) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 export function WorkspaceInbox({ organizationId, manager, events, revision, compact = false }: {
-  organizationId: string; manager: boolean; events: Event[]; revision: number; compact?: boolean;
+  organizationId: string; manager: boolean; events: WorkspaceUpdate[]; revision: number; compact?: boolean;
 }) {
   const [section, setSection] = useState('To do');
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -32,7 +32,7 @@ export function WorkspaceInbox({ organizationId, manager, events, revision, comp
     const client = requireSupabase();
     void Promise.all([
       client.from('certificates').select('id,supplier_id,standard,valid_until').eq('organization_id', organizationId).lte('valid_until', day(until)).order('valid_until').limit(30).abortSignal(controller.signal),
-      client.from('documents').select('id,name,supplier_id,uploaded_at').eq('organization_id', organizationId).eq('verification_status', 'unverified').order('uploaded_at', { ascending: false }).limit(30).abortSignal(controller.signal),
+      client.from('documents').select('id,name,supplier_id,uploaded_at,verification_status').eq('organization_id', organizationId).in('verification_status', ['unverified','rejected']).order('uploaded_at', { ascending: false }).limit(30).abortSignal(controller.signal),
       client.from('data_requests').select('id,title,due_at').eq('organization_id', organizationId).eq('status', 'open').order('due_at').limit(30).abortSignal(controller.signal),
       client.from('relationship_health').select('supplier_id,missing_requirements').eq('organization_id', organizationId).gt('missing_requirements',0).order('completeness').limit(30).abortSignal(controller.signal),
     ]).then(async rows => {
@@ -45,7 +45,7 @@ export function WorkspaceInbox({ organizationId, manager, events, revision, comp
       const base = `/cloud?org=${organizationId}`;
       setTasks([
         ...(rows[0].data || []).map(row => ({ id: `expiry-${row.id}`, kind: 'expiry' as const, urgent: row.valid_until < today, order: row.valid_until, title: row.standard, detail: `${row.valid_until < today ? 'Expired' : 'Expires'} ${dateLabel(row.valid_until)}`, href: `${base}&view=suppliers&supplier=${row.supplier_id}&tab=Certificates` })),
-        ...(rows[1].data || []).map(row => ({ id: `review-${row.id}`, kind: 'review' as const, urgent: false, order: row.uploaded_at, title: row.name, detail: manager ? 'Ready for your review' : 'Awaiting an administrator’s review', href: `${base}&view=documents&document=${row.id}` })),
+        ...(rows[1].data || []).map(row => ({ id: `review-${row.id}`, kind: 'review' as const, urgent: false, order: row.uploaded_at, title: row.name, detail: row.verification_status==='rejected'?'Needs correction':manager ? 'Ready for your review' : 'Awaiting an administrator’s review', href: row.supplier_id?`${base}&view=suppliers&supplier=${row.supplier_id}&tab=Documents&document=${row.id}`:`${base}&view=documents&document=${row.id}` })),
         ...(rows[2].data || []).map(row => ({ id: `request-${row.id}`, kind: 'request' as const, urgent: row.due_at < today, order: row.due_at, title: row.title, detail: `${row.due_at < today ? 'Overdue' : 'Awaiting response'} · Due ${dateLabel(row.due_at)}`, href: `${base}&view=requests&focus=${row.id}` })),
         ...(rows[3].data || []).filter(row => (row.missing_requirements || 0) > 0).map(row => ({ id: `information-${row.supplier_id}`, kind: 'information' as const, urgent: false, order: '9999', title: names.get(row.supplier_id||'')||'Complete supplier information', detail: `${row.missing_requirements} requirements to resolve`, href: `${base}&view=suppliers&supplier=${row.supplier_id}&tab=Requirements` })),
       ].sort((a,b) => Number(b.urgent)-Number(a.urgent) || a.order.localeCompare(b.order)));
@@ -65,7 +65,7 @@ export function WorkspaceInbox({ organizationId, manager, events, revision, comp
       {!compact && tasks.length>=30 && <p className="quiet-note">Up to 30 items per category. Open the source section to explore all records.</p>}
     </>}
     {section === 'Company requests' && <CompanyExchange organizationId={organizationId} manager={manager} revision={revision}/>}
-    {section === 'Updates' && <div className="inbox-updates">{events.map(event=><article key={event.id}><span><Activity size={16}/></span><div><strong>{event.title}</strong><p>{event.detail}</p><time dateTime={event.created_at}>{dateLabel(event.created_at)}</time></div></article>)}{!events.length&&<p className="quiet-note">Your company activity will appear here.</p>}<Link className="text-link" to={`/cloud?view=activity&org=${organizationId}`}>Full activity history<ArrowRight size={15}/></Link></div>}
+    {section === 'Updates' && <div className="inbox-updates"><WorkspaceUpdates events={events} organizationId={organizationId}/><Link className="text-link" to={`/cloud?view=activity&org=${organizationId}`}>Full activity history<ArrowRight size={15}/></Link></div>}
     </MotionPanel>
   </section>;
 }

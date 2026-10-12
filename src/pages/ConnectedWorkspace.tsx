@@ -1,3 +1,6 @@
+import { ResourceTrash } from '../components/ResourceTrash';
+import { resourceLifecycle, documentStatus, type ResourceKind } from '../lib/resource-lifecycle';
+import { WorkspaceUpdates, type WorkspaceUpdate } from '../components/WorkspaceUpdates';
 import { GeneratedLink } from '../components/GeneratedLink';
 import { SavedSupplierSearches } from '../components/SavedSupplierSearches';
 import { RequestDetails } from '../components/RequestDetails';
@@ -11,6 +14,7 @@ import { RefreshControl } from '../components/RefreshControl';
 import { AppearancePicker } from '../components/AppearancePicker';
 import { formValidationMessage } from "../lib/form-validation";
 import { SegmentedControl } from "../components/SegmentedControl";
+import { WorkspaceBilling } from '../components/WorkspaceBilling';
 import { WorkspaceInsights } from "../components/WorkspaceInsights";
 import { AccountProfile, useAccountProfile } from "../components/AccountProfile";
 import { IntakeResponse } from '../components/IntakeResponse';
@@ -76,7 +80,7 @@ import {
   Progress,
   Status,
 } from "../components/ui";
-import { MotionPanel } from "../components/Motion";
+import { MotionPanel, MotionSurface } from "../components/Motion";
 import type { Database } from "../lib/database.types";
 
 type Health = Database["public"]["Views"]["relationship_health"]["Row"];
@@ -84,7 +88,9 @@ type Data = {
   view: string;
   listSupplierIds: string[];
   metrics: { suppliers: number; documents: number; complete: number; requests: number };
+  documentLifecycle?: boolean;
   total: number;
+  sentSharesTotal?: number;
   detailTotal: number;
   page: number;
   org: Row<"organizations">;
@@ -99,9 +105,9 @@ type Data = {
   requirements: Row<"requirements">[];
   certificates: Row<"certificates">[];
   products: Row<"products">[];
-  events: Row<"workspace_events">[];
+  events: WorkspaceUpdate[];
   shares: SharedDocument[];
-  sentShares: Row<"document_shares">[];
+  sentShares: (Row<"document_shares"> & { document_name?: string; recipient_name?: string; recipient_review?: string })[];
   invitations: SafeInvite[];
   links: SafeUploadLink[];
   directory: Row<"company_directory"> | null;
@@ -129,7 +135,7 @@ const titles: Record<string, [string, string]> = {
   suppliers: ["Your connections.", "The companies behind your business."],
   documents: [
     "Evidence, together.",
-    "Your private documents and files shared with your company.",
+    "Your company’s own documents. Ready to reuse and share.",
   ],
   requests: [
     "A clear next step.",
@@ -180,6 +186,7 @@ export function ConnectedWorkspace() {
     : "overview";
   const orgParam = params.get("org");
   const page = Math.max(0, Math.min(100000, Math.floor(Number(params.get("page")) || 0)));
+  const sharePage = Math.max(0, Math.min(100000, Math.floor(Number(params.get("share_page")) || 0)));
   const { resolved, setPreference } = useTheme();
   const [settingsDirty, setSettingsDirty] = useState(false);
   const [supplierDirty,setSupplierDirty] = useState(false);
@@ -197,7 +204,10 @@ export function ConnectedWorkspace() {
   const currentUser = useRef<User | null>(null);
   const [data, setData] = useState<Data | null>(null);
   const accountProfile = useAccountProfile(data?.user.id);
-  const [settingsSection,setSettingsSection] = useState("Company");
+  const requestedSection=params.get('section');
+  const resolvedSection=['Company','Privacy','Appearance','Profile','Billing'].includes(requestedSection||'')?requestedSection!:'Company';
+  const [settingsSection,setSettingsSection] = useState(resolvedSection);
+  useEffect(()=>{setSettingsSection(resolvedSection);},[resolvedSection]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -215,6 +225,7 @@ export function ConnectedWorkspace() {
   function keepEditing(){setLeaveIntent(null);if(blocker.state==="blocked")blocker.reset();}
   function leaveWithoutSaving(){const intent=leaveIntent;navigationAccepted.current=true;setLeaveIntent(null);setSupplierDirty(false);setSettingsDirty(false);setProfileDirty(false);setProductDirty(false);if(blocker.state==="blocked")blocker.proceed();else intent?.run();}
 
+  const [resourceTrash, setResourceTrash] = useState<ResourceKind | null>(null);
   const [confirmation, setConfirmation] = useState<{id: string; title: string; description: string; label: string; cancelLabel?: string; successLabel?: string; run: () => Promise<unknown>} | null>(null);
   const [dialog, setDialog] = useState<
     | "supplier"
@@ -282,7 +293,7 @@ export function ConnectedWorkspace() {
         user = auth.data.user;
         currentUser.current = user;
       }
-      const payload = { organization_id:orgParam, view: ["inbox","response"].includes(view) ? "overview" : view, page, query:searchTerms.query, lookup:searchTerms.lookup, selected, detail_page:detailPage, detail_tab:detailTab, dialog };
+      const payload = { organization_id:orgParam, view: ["inbox","response"].includes(view) ? "overview" : view, page, query:searchTerms.query, lookup:searchTerms.lookup, selected, detail_page:detailPage, detail_tab:detailTab, share_page:sharePage, dialog };
       let result = checkResult(await client.rpc("relay_workspace_snapshot", {payload}).abortSignal(controller.signal)).data as unknown as Omit<Data,"user"|"view"> & {needs_workspace?:boolean};
       if (result.needs_workspace) {
         checkResult(await client.rpc("create_workspace", {company_name:String(user.user_metadata.company_name || "My company"),full_name:String(user.user_metadata.full_name || "")}));
@@ -297,7 +308,7 @@ export function ConnectedWorkspace() {
       clearTimeout(timeout);
       if (version === generation.current) { setLoading(false); setRefreshing(false); }
     }
-  }, [navigate, orgParam, view, page, searchTerms, selected, detailPage, detailTab, dialog]);
+  }, [navigate, orgParam, view, page, searchTerms, selected, detailPage, detailTab, sharePage, dialog]);
   useEffect(() => { void load(); return () => { generation.current++; requestController.current?.abort(); }; }, [load]);
   useEffect(() => {
     const {data:{subscription}} = requireSupabase().auth.onAuthStateChange((event, session) => {
@@ -320,6 +331,8 @@ export function ConnectedWorkspace() {
     setQuery(params.get("q") || "");
     setMenu(false);
     setDialog(null);
+    setShareIds([]);
+    setResourceTrash(null);
     setCustomize(false);
     setGenerated("");
     setConfirmation(null);
@@ -613,6 +626,7 @@ export function ConnectedWorkspace() {
   const shownSuppliers = data?.suppliers.filter(company => data.listSupplierIds.includes(company.id)) || [];
   const title = titles[view];
   const generatedCard = generated && <GeneratedLink invitation={dialog==="invite"} url={generated} message={dialog==="invite" ? inviteDelivery || "Send this invitation to your teammate to join the workspace." : undefined} phase={feedback.phase("copy")} outcomeKey={feedback.version("copy")} onCopy={()=>void copy(generated)}/>;
+  const ownDocuments = data?.documents.filter(doc=>doc.supplier_id===null) || [];
   const supplierWorkspace = supplier && data && (
           <>
             <SupplierRequests organizationId={data.org.id} supplierId={supplier.id} revision={data} onOpen={id=>{const next=new URLSearchParams(params);next.set("focus",id);setParams(next);}}/>
@@ -701,7 +715,7 @@ export function ConnectedWorkspace() {
               {detailTab === "Documents" && (
                 <>
                   {supplier.source_organization_id && <CompanyExchange organizationId={data.org.id} manager={manager} supplierId={supplier.id} onUpdated={()=>void load()}/>}
-                  <div className="supplier-section-heading"><div><h2>Supplier documents</h2><p>Uploaded files and evidence for this connection.</p></div></div>
+                  <div className="supplier-section-heading"><div><h2>Supplier documents</h2><p>Uploaded files and evidence for this connection.</p></div>{manager&&data.documentLifecycle&&<Button variant="ghost" onClick={()=>setResourceTrash("document")}><Trash2 size={15}/>Trash</Button>}</div>
                   <div className="connected-list">
                     {data.documents
                       .filter((doc) => doc.supplier_id === supplier.id)
@@ -715,6 +729,7 @@ export function ConnectedWorkspace() {
                                 : "Company document"}{" "}
                               · {dateLabel(doc.uploaded_at)}
                             </small>
+                            <span className="supplier-document-status" data-document-status={doc.verification_status}>{documentStatus(doc.verification_status)}</span>
                           </div>
                           <Button
                             variant="ghost"
@@ -731,6 +746,7 @@ export function ConnectedWorkspace() {
                   {!data.documents.some(
                     (doc) => doc.supplier_id === supplier.id,
                   ) && <p className="quiet-note">No documents received yet.</p>}
+                  {data.shares.length>0&&<section className="supplier-shared-documents"><div className="supplier-section-heading"><h3>Shared by this company</h3>{manager&&data.documentLifecycle&&<Button variant="ghost" onClick={()=>setResourceTrash("shared_document")}><Trash2 size={15}/>Trash</Button>}</div>{data.shares.map(doc=><div className="list-row" key={doc.id}><div className="row-copy"><button type="button" className="document-open" onClick={()=>{const next=new URLSearchParams(params);next.set("document",doc.document_id);setParams(next);}}>{doc.name}</button><small>Shared {dateLabel(doc.shared_at)}</small><span className="supplier-document-status" data-document-status={doc.review_status}>{documentStatus(doc.review_status||"unverified")}</span></div><Button variant="ghost" aria-label={`Download shared ${doc.name}`} onClick={()=>void download(doc.storage_path,doc.name)}><Download size={16}/></Button></div>)}</section>}
                   {manager && (
                     <ActionButton variant="secondary" disabled={busy} label="Create upload link" pendingLabel="Creating…" successLabel="Link created"
                       phase={feedback.phase(`upload-link:${supplier.id}`)} outcomeKey={feedback.version(`upload-link:${supplier.id}`)} onClick={() => void createLink(supplier.id)}/>
@@ -740,7 +756,7 @@ export function ConnectedWorkspace() {
               )}
               {detailTab === "Requirements" && (
                 <div className="supplier-requirements">
-                  <div className="supplier-section-heading"><div><h2>Requirements</h2><p>Review each requirement and connect the evidence that supports it.</p></div></div>
+                  <div className="supplier-section-heading"><div><h2>Requirements</h2><p>Review each requirement and connect the evidence that supports it.</p></div>{manager&&data.documentLifecycle&&<Button variant="ghost" onClick={()=>setResourceTrash("requirement")}><Trash2 size={15}/>Trash</Button>}</div>
                   {!data.requirements.some(requirement=>requirement.relationship_id===relationship?.id) && <p className="quiet-note">No requirements configured for this supplier.</p>}
                   {data.requirements
                     .filter(
@@ -777,6 +793,7 @@ export function ConnectedWorkspace() {
                               ? "Complete"
                               : "Missing"}
                           </Badge>
+                          {manager&&data.documentLifecycle&&<Button type="button" variant="ghost" className="requirement-remove" disabled={busy} aria-label={`Remove ${requirement.name}`} onClick={()=>{setError("");setConfirmation({id:`remove-requirement:${requirement.id}`,title:"Remove this requirement?",description:`${requirement.name} will leave this supplier’s checklist. Documents are kept and the requirement can be restored from Trash.`,label:"Move to Trash",cancelLabel:"Keep requirement",successLabel:"Removed",run:async()=>{if(!feedback.begin(`remove-requirement:${requirement.id}`))return null;setBusy(true);const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),12000);try{return await resourceLifecycle("trash",data.org.id,"requirement",{id:requirement.id},controller.signal);}catch(failure){setError(errorMessage(failure));feedback.fail(`remove-requirement:${requirement.id}`);return null;}finally{clearTimeout(timeout);setBusy(false);}}});}}><Trash2 size={15}/></Button>}
                         </div>
                         {manager && (
                           <>
@@ -796,7 +813,7 @@ export function ConnectedWorkspace() {
                               </option>
                               {data.documents
                                 .filter(
-                                  (doc) => doc.supplier_id === supplier.id,
+                                  (doc) => doc.supplier_id === supplier.id && doc.verification_status!=="rejected",
                                 )
                                 .map((doc) => (
                                   <option key={doc.id} value={doc.id}>
@@ -951,7 +968,7 @@ export function ConnectedWorkspace() {
           </div>
           <div className="topbar-right">
             {data && <ConnectedSearch organizationId={data.org.id}/>}
-            <button className="icon-button" aria-label={`Switch to ${resolved === "light" ? "dark" : "light"} mode`} onClick={()=>setPreference(resolved==="light"?"dark":"light")}>
+            <button className="icon-button workspace-theme-toggle" aria-label={`Switch to ${resolved === "light" ? "dark" : "light"} mode`} onClick={()=>setPreference(resolved==="light"?"dark":"light")}>
               {resolved==="light"?<Moon size={18}/>:<Sun size={18}/>}
             </button>
             <button
@@ -971,7 +988,7 @@ export function ConnectedWorkspace() {
           {selected ? <header className="supplier-page-heading">
             <Link className="supplier-back" to={`/cloud?${(()=>{const next=new URLSearchParams(params);next.delete("supplier");next.delete("tab");return next.toString();})()}`}><ChevronRight size={15}/>All suppliers</Link>
             <div className="supplier-page-identity"><span className="supplier-page-monogram">{supplier?.legal_name[0] || "·"}</span><div><p className="eyebrow">{supplier?.source_organization_id ? "CONNECTED ON RELAY" : "SUPPLIER CONNECTION"}</p><h1>{supplier?.legal_name || "Supplier workspace"}</h1><p>{[supplier?.country,supplier?.category].filter(Boolean).join(" · ")}</p></div></div>
-            <div className="supplier-page-actions">{manager && <><Button variant="secondary" onClick={()=>openDialog("document")}><ActionIcon kind="upload"/>Upload document</Button><Button onClick={()=>openDialog("request")}><ActionIcon kind="request"/>Request documents</Button></>}</div>
+            <div className="supplier-page-actions">{manager && <><Button variant="secondary" aria-haspopup="dialog" aria-expanded={dialog === "document"} onClick={()=>openDialog("document")}><ActionIcon kind="upload"/>Upload document</Button><Button aria-haspopup="dialog" aria-expanded={dialog === "request"} onClick={()=>openDialog("request")}><ActionIcon kind="request"/>Request documents</Button></>}</div>
           </header> : (
           <header className="page-header connected-heading">
             <div>
@@ -992,6 +1009,8 @@ export function ConnectedWorkspace() {
               ].includes(view) && (
                 <Button
                   disabled={busy}
+                  aria-haspopup="dialog"
+                  aria-expanded={dialog === (view === "documents" ? "document" : view === "requests" ? "request" : view === "team" ? "invite" : view === "products" ? "product" : "supplier")}
                   onClick={() =>
                     openDialog(
                       view === "documents"
@@ -1043,7 +1062,7 @@ export function ConnectedWorkspace() {
               {view === "response" && <IntakeResponse organizationId={data.org.id} manager={manager}/>}
               {view === "overview" && (
                 <>
-                  <div className="overview-tools"><span className="quiet-note">Your workspace at a glance.</span><Button variant="ghost" onClick={()=>setCustomize(true)}><ActionIcon kind="adjust"/>Customize overview</Button></div>
+                  <div className="overview-tools"><span className="quiet-note">Your workspace at a glance.</span><Button variant="ghost" aria-haspopup="dialog" aria-expanded={customize} onClick={()=>setCustomize(true)}><ActionIcon kind="adjust"/>Customize overview</Button></div>
                   {widgets.includes("network") && <div className="connected-metrics">
                     {[
                       [data.metrics.suppliers, "Connected companies"],
@@ -1171,42 +1190,33 @@ export function ConnectedWorkspace() {
               {view === "documents" && (
                 <>
                   <div className="connected-section-heading">
-                    <h2>Your company documents.</h2>
+                    <div><h2>Your company documents.</h2><p className="quiet-note">Only files belonging to {data.org.legal_name}. Supplier documents stay with their supplier.</p></div>
+                    {manager&&data.documentLifecycle&&<Button variant="ghost" onClick={()=>setResourceTrash("document")}><Trash2 size={15}/>Trash</Button>}
                     {manager && (
                       <Button
                         variant="secondary"
-                        disabled={!data.documents.length}
+                        disabled={!ownDocuments.length}
                         onClick={() => openDialog("share")}
                       >
                         {shareIds.length ? `Share ${shareIds.length} selected` : "Share documents"} <ArrowUpRight size={16} />
                       </Button>
                     )}
                   </div>
+                  <FieldLabel className="company-library-search">Find a company document<Input type="search" value={query} placeholder="Search your company documents…" onChange={event=>{setQuery(event.target.value);setParams(previous=>{const next=new URLSearchParams(previous);next.set("q",event.target.value);next.set("page","0");return next;},{replace:true});}}/></FieldLabel>
                   {shareIds.length>0&&<div className="document-selection-summary"><span>{shareIds.length} of 20 documents selected for sharing</span><Button variant="ghost" onClick={()=>setShareIds([])}>Clear selection</Button></div>}
                   <div className="connected-panel connected-list">
-                    {data.documents.map((doc) => (
+                    {ownDocuments.map((doc) => (
                       <div className="list-row" key={doc.id}>
-                        {manager&&<input className="document-selection" type="checkbox" aria-label={`Select ${doc.name} for sharing`} disabled={!shareIds.includes(doc.id)&&shareIds.length>=20} checked={shareIds.includes(doc.id)} onChange={event=>setShareIds(previous=>event.target.checked?[...previous,doc.id].slice(0,20):previous.filter(id=>id!==doc.id))}/>}
+                        {manager&&<input className="document-selection" type="checkbox" aria-label={`Select ${doc.name} for sharing`} disabled={doc.verification_status==="rejected" || (!shareIds.includes(doc.id)&&shareIds.length>=20)} checked={shareIds.includes(doc.id)} onChange={event=>setShareIds(previous=>event.target.checked?[...previous,doc.id].slice(0,20):previous.filter(id=>id!==doc.id))}/>}
                         <span className="activity-icon">
                           <Files size={19} />
                         </span>
                         <div className="row-copy">
                           <button type="button" className="document-open" onClick={()=>{const next=new URLSearchParams(params);next.set("document",doc.id);setParams(next);}}>{doc.name}</button>
-                          <small>
-                            {
-                              data.suppliers.find(
-                                (company) => company.id === doc.supplier_id,
-                              )?.legal_name
-                            }
-                            {doc.submitted_by_name
-                              ? ` · Submitted by ${doc.submitted_by_name}`
-                              : ""}
-                          </small>
+                          <small>{doc.kind==='certificate'?'Certificate':doc.kind==='declaration'?'Declaration':'Company information'} · Uploaded {dateLabel(doc.uploaded_at)}</small>
                         </div>
                         <Badge>
-                          {doc.verification_status === "verified"
-                            ? "Reviewed"
-                            : "Awaiting review"}
+                          <span data-document-status={doc.verification_status}>{documentStatus(doc.verification_status)}</span>
                         </Badge>
                         <Button
                           variant="ghost"
@@ -1219,40 +1229,11 @@ export function ConnectedWorkspace() {
                         </Button>
                       </div>
                     ))}
-                    {!data.documents.length && (
+                    {!ownDocuments.length && (
                       <EmptyState
                         title="Give evidence a place."
-                        description="Upload a supplier document or create an upload link to receive files directly."
+                        description="Keep your own certificates, declarations and company information here. Supplier files live in each supplier’s Documents tab."
                       />
-                    )}
-                  </div>
-                  <div className="connected-section-heading">
-                    <h2>Shared with your company.</h2>
-                  </div>
-                  <div className="connected-panel connected-list">
-                    {data.shares.map((doc) => (
-                      <div className="list-row" key={doc.id}>
-                        <div className="row-copy">
-                          <button type="button" className="document-open" onClick={()=>{const next=new URLSearchParams(params);next.set("document",doc.document_id);setParams(next);}}>{doc.name}</button>
-                          <small>
-                            From {doc.sender_name} · {dateLabel(doc.shared_at)}
-                          </small>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          aria-label={`Download shared ${doc.name}`}
-                          onClick={() =>
-                            void download(doc.storage_path, doc.name)
-                          }
-                        >
-                          <Download size={17} />
-                        </Button>
-                      </div>
-                    ))}
-                    {!data.shares.length && (
-                      <p className="quiet-note">
-                        Files shared by registered companies will appear here.
-                      </p>
                     )}
                   </div>
                   {manager &&
@@ -1268,12 +1249,13 @@ export function ConnectedWorkspace() {
                                   {
                                     data.documents.find(
                                       (doc) => doc.id === share.document_id,
-                                    )?.name
+                                    )?.name || share.document_name || "Shared document"
                                   }
                                 </strong>
                                 <small>
-                                  Shared {dateLabel(share.shared_at)}
+                                  {share.recipient_name ? `With ${share.recipient_name} · ` : ""}Shared {dateLabel(share.shared_at)}
                                 </small>
+                                {share.recipient_review&&<span className="supplier-document-status" data-document-status={share.recipient_review}>Recipient review: {documentStatus(share.recipient_review).toLowerCase()}</span>}
                               </div>
                               <ActionButton
                                 variant="secondary"
@@ -1282,6 +1264,7 @@ export function ConnectedWorkspace() {
                                 phase={feedback.phase(actionKey("revoke_share", {id:share.id}))} outcomeKey={feedback.version(actionKey("revoke_share", {id:share.id}))} label="Revoke access" pendingLabel="Updating…" successLabel="Access revoked"/>
                             </div>
                           ))}
+                        {(data.sentSharesTotal || 0)>50&&<PageControls page={sharePage} total={data.sentSharesTotal!} busy={refreshing} onChange={nextPage=>setParams(previous=>{const next=new URLSearchParams(previous);next.set("share_page",String(nextPage));return next;})}/>}
                       </section>
                     )}
                 </>
@@ -1572,11 +1555,12 @@ export function ConnectedWorkspace() {
                 </>
               )}
               {view === "settings" && (
-                <div className="settings-workspace" data-section={settingsSection}>
+                <MotionSurface identity={settingsSection} selector=".settings-company,.settings-privacy,.settings-appearance,.profile-settings,.settings-security,.billing-workspace" className="settings-workspace" data-section={settingsSection}>
                 <SegmentedControl className="settings-sections" label="Settings section" value={settingsSection}
-                  options={["Company","Privacy","Appearance","Profile"].map(section => ({ value: section, label: section,
+                  options={["Company","Privacy","Appearance","Profile","Billing"].map(section => ({ value: section, label: section === 'Billing' ? 'Plan & billing' : section,
                     dirty: section === "Profile" ? profileDirty : ["Company", "Privacy"].includes(section) && settingsDirty }))}
-                  onChange={setSettingsSection}/>
+                  onChange={section=>{setSettingsSection(section);setParams(previous=>{const next=new URLSearchParams(previous);next.set('section',section);return next;},{replace:true});}}/>
+                {settingsSection==='Billing'&&<WorkspaceBilling key={`billing:${data.org.id}`} organizationId={data.org.id} companyName={data.org.legal_name} email={data.user.email||''} initialPlan={params.get('plan')} initialCycle={params.get('cycle')}/>}
                 <form
                   key={data.org.id}
                   onChange={()=>{setSettingsDirty(true);feedback.reset("settings:");setError("");}}
@@ -1700,31 +1684,9 @@ export function ConnectedWorkspace() {
                       Sign-in and account security <ArrowUpRight size={15} />
                     </Link>
                   </section>
-                </div>
+                </MotionSurface>
               )}
-              {view === "activity" && (
-                <div className="connected-panel">
-                  {data.events.length ? (
-                    data.events.map((event) => (
-                      <div className="connected-event" key={event.id}>
-                        <span>
-                          <Activity size={16} />
-                        </span>
-                        <div>
-                          <strong>{event.title}</strong>
-                          <p>{event.detail}</p>
-                          <small>{dateLabel(event.created_at)}</small>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <EmptyState
-                      title="Your progress belongs here."
-                      description="Team joins, supplier submissions and shared documents will appear as your workspace grows."
-                    />
-                  )}
-                </div>
-              )}
+              {view === "activity" && <div className="connected-panel"><WorkspaceUpdates events={data.events} organizationId={data.org.id}/></div>}
               {["suppliers","documents","requests","products","team","activity"].includes(view) && data.total>50 && <PageControls page={page} total={data.total} busy={refreshing} onChange={pageNumber=>setParams(previous=>{const next=new URLSearchParams(previous);next.set("page",String(pageNumber));return next;})}/>}
               </> }
             </MotionPanel>
@@ -1737,7 +1699,8 @@ export function ConnectedWorkspace() {
       </div>
       {data && <RequestDetails id={params.get("focus")} organizationId={data.org.id} onClose={()=>{const next=new URLSearchParams(params);next.delete("focus");setParams(next,{replace:true});}}/>}
       {data && <ProductDetails onDirtyChange={setProductDirty} id={params.get("product")} organizationId={data.org.id} manager={manager} onClose={()=>{const next=new URLSearchParams(params);next.delete("product");setParams(next,{replace:true});}} onChanged={()=>void load()}/>}
-      {data && <DocumentPreview id={params.get("document")} organizationId={data.org.id} manager={manager} onClose={()=>{const next=new URLSearchParams(params);next.delete("document");setParams(next,{replace:true});}} onChanged={()=>void load()}/>}
+      {data && <DocumentPreview id={params.get("document")} organizationId={data.org.id} manager={manager} lifecycleEnabled={!!data.documentLifecycle} onClose={()=>{const next=new URLSearchParams(params);next.delete("document");setParams(next,{replace:true});}} onChanged={()=>void load()}/>}
+      {data && <ResourceTrash open={!!resourceTrash} organizationId={data.org.id} resource={resourceTrash || "document"} supplierId={view==="suppliers"?selected||undefined:undefined} onClose={()=>setResourceTrash(null)} onChanged={()=>void load()}/>}
       {data && <SupplierTrash key={data.org.id} open={trashOpen} organizationId={data.org.id} supplier={removeSupplier} onClose={()=>setTrashOpen(false)} onChanged={removed=>{if(removed){setSupplierDirty(false);setSelected(null);setGenerated("");}else void load();}}/>}
       <Dialog open={!!leaveIntent || blocker.state==="blocked"} onClose={keepEditing} title="Keep your changes?" className="leave-dialog">
         <p>You have unsaved changes. Keep editing or leave without saving.</p>
@@ -1792,11 +1755,7 @@ export function ConnectedWorkspace() {
       >
         {data &&
           (dialog === "notifications" ? (
-            <div className="workspace-updates"><p className="updates-intro">The latest changes across your company workspace.</p>
-              {data.events.slice(0,12).map(event=><article className="workspace-update" key={event.id}><span className="update-orbit" aria-hidden="true"><Activity size={15}/></span><div><strong>{event.title}</strong>{event.detail&&<p>{event.detail}</p>}<time dateTime={event.created_at}>{dateLabel(event.created_at)}</time></div></article>)}
-              {!data.events.length&&<div className="updates-empty"><Bell size={26}/><h3>A little quiet.</h3><p>Requests, document submissions and team updates will appear here.</p></div>}
-              <Link className="button button-secondary updates-history" to={`/cloud?view=activity&org=${data.org.id}`} onClick={()=>setDialog(null)}>View workspace activity <ArrowUpRight size={15}/></Link>
-            </div>
+            <div className="workspace-updates"><p className="updates-intro">What changed, who it affects and where to go next.</p><WorkspaceUpdates events={data.events.slice(0,12)} organizationId={data.org.id} compact onNavigate={()=>setDialog(null)}/><Link className="button button-secondary updates-history" to={`/cloud?view=activity&org=${data.org.id}`} onClick={()=>setDialog(null)}>View all activity <ArrowUpRight size={15}/></Link></div>
           ) : dialog === "invite" && generated ? (
             generatedCard
           ) : (
@@ -1885,13 +1844,13 @@ export function ConnectedWorkspace() {
                   <p className="quiet-note">{shareIds.length} of 20 documents selected. Search to find older files; your selection is retained.</p>
                   <fieldset className="share-document-options">
                     <legend>Choose documents to share</legend>
-                    {data.documents.map((doc) => (
+                    {ownDocuments.map((doc) => (
                       <FieldLabel key={doc.id}>
                         <input
                           type="checkbox"
                           name="documents"
                           value={doc.id}
-                          disabled={!shareIds.includes(doc.id)&&shareIds.length>=20} checked={shareIds.includes(doc.id)}
+                          disabled={doc.verification_status==="rejected" || (!shareIds.includes(doc.id)&&shareIds.length>=20)} checked={shareIds.includes(doc.id)}
                           onChange={event=>setShareIds(event.target.checked?[...shareIds,doc.id].slice(0,20):shareIds.filter(id=>id!==doc.id))}
                         />
                         <span>{doc.name}</span>
@@ -1941,10 +1900,10 @@ export function ConnectedWorkspace() {
                 </>
               ) : (
                 <>
-                  <FieldLabel>Find a supplier<Input type="search" value={lookupQuery} onChange={event=>setLookupQuery(event.target.value)} placeholder="Search your suppliers…"/></FieldLabel>
+                  {dialog === "document" && view === "documents" ? <div className="company-library-upload-context"><input type="hidden" name="supplier" value="company"/><Building2 size={20} aria-hidden="true"/><div><strong>{data.org.legal_name}</strong><p>Added to your company’s document library. Share it when you’re ready.</p></div></div> : <><FieldLabel>Find a supplier<Input type="search" value={lookupQuery} onChange={event=>setLookupQuery(event.target.value)} placeholder="Search your suppliers…"/></FieldLabel>
                   <FieldLabel>
                     {dialog === "document" ? "Belongs to" : "Supplier"}
-                    <Select required name="supplier" defaultValue={selected || ""} disabled={refreshing}>
+                    <Select required name="supplier" defaultValue={selected || (dialog === "document" ? "company" : "")} disabled={refreshing}>
                       <option value="">Choose a supplier</option>
                       {dialog === "document" && <option value="company">My company · {data.org.legal_name}</option>}
                       {data.suppliers.filter(company=>company.legal_name.toLowerCase().includes(searchTerms.lookup.toLowerCase())).map((company) => (
@@ -1953,7 +1912,7 @@ export function ConnectedWorkspace() {
                         </option>
                       ))}
                     </Select>
-                  </FieldLabel>
+                  </FieldLabel></>}
                   {dialog === "product" ? (
                     <>
                       <FieldLabel>
@@ -1994,7 +1953,7 @@ export function ConnectedWorkspace() {
               )}
               </fieldset>
               <div className="action-form-footer">
-              {error && <p className="form-feedback-error" role="alert"><OutcomeMark tone="error"/><span>{error}</span></p>}
+              <div className="action-feedback-slot">{error && <p className="form-feedback-error" role="alert"><OutcomeMark tone="error"/><span>{error}</span></p>}</div>
               <ActionButton type="submit" phase={feedback.phase("dialog")} outcomeKey={feedback.version("dialog")} errorLabel={error.startsWith("Complete ") ? "Check details" : "Try again"}
                 disabled={busy || ((dialog === "request" || dialog === "product") && !data.suppliers.length)}
                 label={dialog === "invite" ? "Create invitation" : dialog === "share" ? "Share selected documents" : "Save to workspace"}

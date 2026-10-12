@@ -1,7 +1,41 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
+import { reducedMotion } from '../lib/motion';
 
 export const settle = "cubic-bezier(0.16, 1, 0.3, 1)";
+
+/** Actual values change immediately; motion never counts through invented amounts. */
+export function MotionValue({ children }: { children: string }) {
+  const current = useRef<HTMLSpanElement>(null);
+  const outgoing = useRef<HTMLSpanElement>(null);
+  const previous = useRef(children);
+  useLayoutEffect(() => {
+    const old = previous.current;
+    previous.current = children;
+    if (old === children || reducedMotion() || !current.current || !outgoing.current) return;
+    outgoing.current.textContent = old;
+    const animations = [
+      outgoing.current.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-5px)' }], { duration: 180, easing: 'ease-out' }),
+      current.current.animate([{ opacity: 0, transform: 'translateY(5px)' }, { opacity: 1, transform: 'none' }], { duration: 280, easing: settle }),
+    ];
+    return () => animations.forEach(animation => animation.cancel());
+  }, [children]);
+  return <span className="motion-value"><span ref={outgoing} className="motion-value-outgoing" aria-hidden="true"/><span ref={current}>{children}</span></span>;
+}
+
+/** Keep forms mounted while their visible surface settles, preserving edits and focus. */
+export function MotionSurface({ identity, selector, className = '', children, ...props }: {
+  identity: string; selector?: string; className?: string; children: ReactNode;
+} & React.HTMLAttributes<HTMLDivElement>) {
+  const surface = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!surface.current || reducedMotion()) return;
+    const targets = selector ? [...surface.current.querySelectorAll<HTMLElement>(selector)].filter(element => element.getClientRects().length) : [surface.current];
+    const animations = targets.map(element => element.animate([{ opacity: .35, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 320, easing: settle }));
+    return () => animations.forEach(animation => animation.cancel());
+  }, [identity, selector]);
+  return <div {...props} ref={surface} className={className}>{children}</div>;
+}
 export function MotionWords({ children }: { children: string }) {
   return (
     <span className="motion-words" aria-label={children}>
@@ -27,11 +61,17 @@ export function MotionPanel({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [snapshot, setSnapshot] = useState({ identity, children });
+  const latest = useRef(children);
+  const visible = useRef(children);
+  useLayoutEffect(() => {
+    latest.current = children;
+    if (snapshot.identity === identity) visible.current = children;
+  });
   useLayoutEffect(() => {
     if (snapshot.identity === identity) return;
     const el = ref.current;
     if (compact || !el || matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setSnapshot({ identity, children });
+      setSnapshot({ identity, children: latest.current });
       return;
     }
     let active = true;
@@ -44,46 +84,31 @@ export function MotionPanel({
     );
     exit.finished
       .then(() => {
-        if (active) setSnapshot({ identity, children });
+        if (active) setSnapshot({ identity, children: latest.current });
       })
       .catch(() => {});
     return () => {
       active = false;
       exit.cancel();
     };
-  }, [identity, snapshot.identity, children]);
+  }, [identity, snapshot.identity, compact]);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const animation = el.animate(
       [
-        { opacity: 0, transform: compact ? "translateY(6px)" : "translateY(18px) scale(.985)" },
+        { opacity: 0, transform: "translateY(6px)" },
         { opacity: 1, transform: "none" },
       ],
-      { duration: compact ? 240 : 640, easing: settle },
-    );
-    const items = (compact ? [] : [...el.children]).map((child, i) =>
-      child.animate(
-        [
-          { opacity: 0, transform: "translateY(12px)" },
-          { opacity: 1, transform: "none" },
-        ],
-        {
-          duration: compact ? 220 : 560,
-          delay: compact ? Math.min(20 * i, 60) : 35 * i,
-          easing: settle,
-          fill: "backwards",
-        },
-      ),
+      { duration: compact ? 240 : 360, easing: settle },
     );
     return () => {
       animation.cancel();
-      items.forEach((a) => a.cancel());
     };
   }, [snapshot.identity]);
   return (
     <div ref={ref} className="motion-panel">
-      {snapshot.identity === identity ? children : snapshot.children}
+      {snapshot.identity === identity ? children : visible.current}
     </div>
   );
 }

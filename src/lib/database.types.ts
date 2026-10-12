@@ -263,6 +263,9 @@ export type Database = {
           supplier_id: string | null
           uploaded_at: string
           uploaded_by: string | null
+          review_note: string
+          reviewed_at: string | null
+          reviewed_by: string | null
           verification_status: string
         }
         Insert: {
@@ -278,6 +281,9 @@ export type Database = {
           supplier_id: string | null
           uploaded_at?: string
           uploaded_by?: string | null
+          review_note?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           verification_status?: string
         }
         Update: {
@@ -293,6 +299,9 @@ export type Database = {
           supplier_id?: string | null
           uploaded_at?: string
           uploaded_by?: string | null
+          review_note?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           verification_status?: string
         }
         Relationships: [
@@ -888,6 +897,9 @@ export type Database = {
       }
     }
     Functions: {
+      relay_billing_snapshot: { Args: { org: string; env?: string }; Returns: Json };
+      relay_billing_service: { Args: { action: string; payload: Json }; Returns: Json };
+      relay_resource_lifecycle: { Args: { action: string; payload?: Json }; Returns: Json };
       relay_exchange_api: { Args: { action: string; payload?: Json }; Returns: Json };
       relay_supplier_lifecycle: { Args: { action: string; payload?: Json }; Returns: Json };
       relay_platform_admin: { Args: { action: string; payload?: Json }; Returns: Json }

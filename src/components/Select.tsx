@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type SelectHTMLAttributes } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
+import { springEasing } from '../lib/motion';
 
 /** The native control owns form values/validation; the popover supplies a consistent desktop menu. */
 export function Select({ children, className = '', value, defaultValue, onChange, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
@@ -17,6 +18,7 @@ export function Select({ children, className = '', value, defaultValue, onChange
  const keyboard = useRef(false);
  const search = useRef({text:'',time:0});
  const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+ const motionFrame = useRef<{ transform: string; opacity: string } | null>(null);
  useEffect(() => {
   const panel = menu.current;
   return () => { clearTimeout(closeTimer.current); panel?.hidePopover(); };
@@ -33,13 +35,27 @@ export function Select({ children, className = '', value, defaultValue, onChange
  useEffect(() => {
   const panel = menu.current!;
   clearTimeout(closeTimer.current);
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let animation: Animation | undefined;
+  const cleanup = () => {
+   if (animation?.playState === 'running') {
+    const style = getComputedStyle(panel);
+    motionFrame.current = { transform: style.transform, opacity: style.opacity };
+   }
+   animation?.cancel();
+   clearTimeout(closeTimer.current);
+  };
   if (!open) {
    if (panel.matches(':popover-open')) {
     panel.dataset.closing = 'true';
     panel.inert = true;
-    closeTimer.current = setTimeout(() => panel.hidePopover(), matchMedia('(prefers-reduced-motion: reduce)').matches || keyboard.current ? 0 : 120);
+    if (!reduced && !keyboard.current) animation = panel.animate([
+     motionFrame.current || { transform: 'none', opacity: 1 },
+     { transform: 'scale(.97)', opacity: 0 },
+    ], { duration: 120, easing: 'ease-in', fill: 'forwards' });
+    closeTimer.current = setTimeout(() => { motionFrame.current = null; panel.hidePopover(); animation?.cancel(); }, reduced || keyboard.current ? 0 : 120);
    }
-   return () => clearTimeout(closeTimer.current);
+   return cleanup;
   }
   panel.inert = false;
   delete panel.dataset.closing;
@@ -57,11 +73,21 @@ export function Select({ children, className = '', value, defaultValue, onChange
   };
   position();
   menu.current?.showPopover();
+  if (!reduced) {
+   animation = panel.animate([
+    motionFrame.current || { transform: keyboard.current ? 'none' : 'scale(.94)', opacity: 0 },
+    { transform: 'none', opacity: 1 },
+   ], { duration: keyboard.current ? 120 : 400, easing: keyboard.current ? 'ease-out' : springEasing(400, 25, 280), fill: 'both' });
+   const opening = animation;
+   animation.finished.then(() => {
+    if (opening.playState === 'finished') { motionFrame.current = null; opening.cancel(); }
+   }).catch(() => {});
+  }
   const dismiss = (event: PointerEvent) => { if (!menu.current?.contains(event.target as Node) && !trigger.current?.contains(event.target as Node)) setOpen(false); };
   document.addEventListener('pointerdown', dismiss);
   window.addEventListener('resize', position);
   window.addEventListener('scroll', position, true);
-  return () => { document.removeEventListener('pointerdown',dismiss); window.removeEventListener('resize',position); window.removeEventListener('scroll',position,true); };
+  return () => { cleanup(); document.removeEventListener('pointerdown',dismiss); window.removeEventListener('resize',position); window.removeEventListener('scroll',position,true); };
  }, [open]);
  useEffect(() => { if (open) menu.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({block:'nearest'}); }, [active, open]);
  const choose = (index:number) => {
